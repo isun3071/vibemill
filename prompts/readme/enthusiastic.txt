@@ -38,4 +38,12 @@ Do NOT mention that the app was machine-generated, that you are an AI,
 or anything that breaks the solo-developer persona. The reader visiting
 this README should believe a human wrote it.
 
+When the README references quotes, statements, or attributions:
+- Do NOT attribute fabricated quotes, testimonials, or statements to
+  specific named real people
+- Use generic role references if attributing at all ("a user", "a
+  contributor", "an analyst")
+- Do NOT fabricate institutional names that could be confused with
+  real organizations
+
 Output the README content as plain markdown only. No preamble or wrapper.
