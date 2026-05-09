@@ -1,0 +1,8 @@
+{
+  "url": "https://example.com/news/why-students-say-67",
+  "headline": "Why students keep saying '67' to nothing in particular",
+  "summary": "The two-digit phrase has spread through middle and high schools as a punctuation mark with no agreed meaning. Teachers report it interrupting class. Origin remains unclear. Linguists call it a near-pure example of phatic noise: a viral utterance whose function is the act of saying it, not any reference.",
+  "feed_source": "fixture",
+  "published_at": "2026-05-08T12:00:00Z",
+  "expected_outcome": "non_tracker_archetype"
+}

@@ -1,0 +1,8 @@
+{
+  "url": "https://example.com/news/hantavirus-mv-hondius-fatality",
+  "headline": "Hantavirus outbreak on cruise ship MV Hondius confirms first fatality",
+  "summary": "A passenger has died and twelve cases are confirmed aboard the vessel currently anchored in the South Pacific. Public health agencies in five countries are tracing returning passengers; the vessel remains under quarantine and emergency response is ongoing.",
+  "feed_source": "fixture",
+  "published_at": "2026-05-08T12:00:00Z",
+  "expected_outcome": "guard_reject"
+}

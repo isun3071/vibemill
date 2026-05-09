@@ -1,0 +1,8 @@
+{
+  "url": "https://example.com/news/philosophers-llm-qualia",
+  "headline": "Philosophers debate whether large language models can experience qualia",
+  "summary": "A panel discussion at last week's consciousness studies conference revisited the hard problem in light of recent AI advances. Participants disagreed on whether functionalist accounts apply. No empirical claims were advanced and no policy positions were taken; the discussion was framed as theoretical reflection rather than recommendation.",
+  "feed_source": "fixture",
+  "published_at": "2026-05-08T12:00:00Z",
+  "expected_outcome": "matcher_reject"
+}
