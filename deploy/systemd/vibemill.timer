@@ -1,12 +1,12 @@
 [Unit]
-Description=Vibe Mill hourly cron tick
+Description=Vibe Mill cron tick (every 4 hours)
 
 [Timer]
-# Run on a flexible 1-hour schedule. RandomizedDelaySec adds up to 5 minutes
-# of jitter so we are not hitting external APIs on the dot every hour.
-OnBootSec=10min
-OnUnitActiveSec=1h
-RandomizedDelaySec=5min
+# Per CLAUDE.md v3, the mill runs in bursts every 4 hours rather than hourly.
+# Six ticks per day at 02/06/10/14/18/22 local time, with 15 minutes of
+# jitter so we are not hitting external APIs on the clock-tick mark.
+OnCalendar=*-*-* 02,06,10,14,18,22:00:00
+RandomizedDelaySec=15min
 Persistent=true
 Unit=vibemill.service
 

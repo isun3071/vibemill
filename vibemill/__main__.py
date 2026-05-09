@@ -41,6 +41,7 @@ from . import (
     readme_writer,
     retire,
     screenshot,
+    security,
     snapshot,
     vercel_deploy,
     verify,
@@ -57,7 +58,11 @@ from .verify import VERDICT_FAILED, VERDICT_LOOKS_GOOD
 log = logging.getLogger(__name__)
 
 
-MAX_APPS_PER_TICK = 3
+# CLAUDE.md v3 changed the cadence from hourly to every 4 hours: 6 ticks/day
+# instead of 24. To keep the 5-10 apps/day target, the per-tick budget rises
+# from ~0.4 to ~1.7 apps. Cap at 5 to give one tick room to clear a backlog
+# while still bounding worst-case cost spike.
+MAX_APPS_PER_TICK = 5
 NEXT_BUILD_TIMEOUT_S = 240
 
 
@@ -205,7 +210,9 @@ def _ship_one(item: NewsItem) -> str:
     log.info("shipping %s (archetype=tracker, score=%d)", app_id, m.scores.tracker)
     started = datetime.now(timezone.utc)
 
-    # 3. Generate + verify + readme + build (one retry on build failure)
+    # 3. Generate -> verify -> static analysis -> build, with one retry on build
+    # failure (per GENERATOR.md v3). Static analysis is a hard gate with NO
+    # retry: a forbidden pattern is a policy violation, not a transient error.
     chassis_dir = settings.archetypes_dir / "tracker" / "chassis"
     work: Path | None = None
     gen_out: GeneratorOutput | None = None
@@ -213,6 +220,7 @@ def _ship_one(item: NewsItem) -> str:
     readme_md = ""
     build_ok = False
     build_err: str | None = None
+    forbidden_result: security.StaticAnalysisResult | None = None
 
     for attempt in (1, 2):
         try:
@@ -244,6 +252,20 @@ def _ship_one(item: NewsItem) -> str:
             data_ts=verify_outcome.output.data_ts,
             readme_md=readme_md,
         )
+
+        # Static analysis: hard policy gate. No retry on failure.
+        sa = security.static_analysis(
+            {
+                "app/page.tsx": verify_outcome.output.page_tsx,
+                "lib/data.ts": verify_outcome.output.data_ts,
+            },
+            archetype="tracker",
+        )
+        if not sa.safe:
+            log.warning("%s: static analysis stillborn (attempt %d): %s", app_id, attempt, sa.reason)
+            forbidden_result = sa
+            break
+
         ok, output = _run_next_build(work)
         if ok:
             build_ok = True
@@ -251,6 +273,31 @@ def _ship_one(item: NewsItem) -> str:
             break
         log.warning("%s: build failed (attempt %d): %s", app_id, attempt, output[:300])
         build_err = output
+
+    if forbidden_result is not None:
+        elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
+        db.insert_app(AppRecord(
+            id=app_id, prompt=prompt, archetype="tracker",
+            archetype_score=m.scores.tracker,
+            tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
+            source="news",
+            source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
+            status="stillborn", death_cause="forbidden_pattern",
+            generation_seconds=elapsed,
+            verifier_verdict=(verify_outcome.verdict if verify_outcome else None),
+            verifier_notes=(verify_outcome.notes if verify_outcome else None),
+        ))
+        audit.event(
+            audit.ORCHESTRATOR, "app.stillborn", target=app_id,
+            reason=f"forbidden_pattern: {forbidden_result.reason}",
+        )
+        db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
+                             published_at=item.published_at, guard_status="passed",
+                             matched_archetype="tracker", matcher_score=m.scores.tracker,
+                             resulted_in_app=app_id)
+        if work is not None:
+            shutil.rmtree(work, ignore_errors=True)
+        return "stillborn_forbidden"
 
     if not build_ok or gen_out is None or verify_outcome is None:
         elapsed = int((datetime.now(timezone.utc) - started).total_seconds())

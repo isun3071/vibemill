@@ -84,6 +84,7 @@ def smoke_cmd(keep: bool) -> None:
     console.print(f"  matcher selected: {result.matcher_selected}")
     console.print(f"  generator: {result.generator_chars} chars across two slots")
     console.print(f"  verifier verdict: {result.verifier_verdict}")
+    console.print(f"  static analysis: {'OK' if result.static_analysis_safe else 'FAILED'}")
     console.print(f"  build: {'OK' if result.build_ok else 'FAILED'} in {result.build_seconds}s")
     if keep:
         console.print(f"  workdir: {result.workdir}")

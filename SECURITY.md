@@ -120,20 +120,59 @@ The orchestrator runs `next build` against LLM-generated code. This is **executi
 - **No filesystem access beyond the temp directory.** Run `next build` with reduced privileges if feasible (a dedicated unprivileged user; not implemented in V0 but considered for V1).
 - **Static analysis check** before building: scan the generated code for suspicious patterns (`fetch(`, `eval(`, `child_process`, `fs.writeFile`). If found, mark the app stillborn rather than building. This filters out the LLM accidentally writing dangerous code without imposing burdensome sandboxing.
 
-The static analysis check runs in `generator.py` after the LLM produces output and before the build:
+The static analysis check runs in `vibemill/security.py`, called by the orchestrator after the verifier and before the `next build` step. See `SECURITY_ADDITIONS.md` for the patch context. The full pattern list (also enforces `ANTI_PATTERNS.md` rules 11 and 12):
 
 ```python
-SUSPICIOUS_PATTERNS = [
-    r'\beval\s*\(',
-    r'\bnew\s+Function\s*\(',
-    r'\bchild_process\b',
-    r'\bfs\.\w+',
-    r'\brequire\s*\(\s*["\']https?:',
-    r'\bfetch\s*\(.*?\$\{',  # template-string dynamic fetch
-]
+SUSPICIOUS_PATTERNS_UNIVERSAL = (
+    # Pre-existing safety
+    r"\beval\s*\(",
+    r"\bnew\s+Function\s*\(",
+    r"\bchild_process\b",
+    r"\bfs\.\w+",
+    r"\brequire\s*\(\s*[\"']https?:",
+
+    # Rule 11: runtime data fetching
+    r"\bfetch\s*\(",
+    r"\baxios\b",
+    r"\bhttpx\b",
+    r"\bgot\s*\(",
+    r"\bnode-fetch\b",
+    r"\bcheerio\b",
+    r"\bjsdom\b",
+    r"\bpuppeteer\b",
+    r"\bplaywright\b",
+
+    # Rule 12: persistent storage (database clients)
+    r"\bpg\b",
+    r"\bmysql2?\b",
+    r"@supabase/supabase-js",
+    r"@vercel/kv",
+    r"@vercel/postgres",
+    r"better-sqlite3",
+    r"\bprisma\b",
+    r"@planetscale/database",
+    r"\bneon-database\b",
+    r"@neondatabase/serverless",
+
+    # Forbidden node APIs
+    r"\bnet\.",
+    r"\bdgram\.",
+    r"\btls\.",
+    r"\bcrypto\.subtle",
+
+    # Rule 12: storage APIs forbidden in all archetypes
+    r"\bsessionStorage\b",
+    r"document\.cookie\s*=",
+)
 ```
 
-These patterns are NOT exhaustive; the goal is to catch the obvious cases while keeping false positives low.
+`localStorage` is permitted only in the `glorified_todo` archetype; the
+`static_analysis(slot_files, archetype)` function applies this conditionally.
+
+These patterns are NOT exhaustive; the goal is to catch the obvious cases
+while keeping false positives low. On match: app is stillborn with
+`death_cause='forbidden_pattern'`. No retry (per `GENERATOR.md` failure
+mode 3).
 
 ## Supply chain
 

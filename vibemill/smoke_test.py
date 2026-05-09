@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import db, generator, guard, matcher, readme_writer, verify
+from . import db, generator, guard, matcher, readme_writer, security, verify
 from .config import get_settings
 from .models import NewsItem
 
@@ -48,6 +48,7 @@ class SmokeResult:
     matcher_selected: list[str]
     generator_chars: int
     verifier_verdict: str
+    static_analysis_safe: bool
     build_ok: bool
     build_seconds: int
     workdir: Path
@@ -96,12 +97,12 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
     item = _load_fixture()
     prompt = f"{item.headline}. {item.summary}".strip()
 
-    log.info("smoke: 1/9 guard")
+    log.info("smoke: 1/10 guard")
     g = guard.check(prompt, app_id="smoke")
     if g.decision != "pass":
         raise SmokeFailure(f"guard rejected fixture: {g.reason}")
 
-    log.info("smoke: 2/9 matcher")
+    log.info("smoke: 2/10 matcher")
     m = matcher.score(prompt, app_id="smoke")
     if m is None:
         raise SmokeFailure("matcher returned None (parse failures)")
@@ -112,7 +113,7 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
             f"scores={m.scores.as_dict()}"
         )
 
-    log.info("smoke: 5/9 readme (single LLM call, independent of slot files)")
+    log.info("smoke: 5/10 readme (single LLM call, independent of slot files)")
     readme = readme_writer.write(
         app_name="smoke-test-tracker",
         prompt=prompt,
@@ -127,11 +128,11 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
     v_out = None
     build_err: str | None = None
 
-    # generator -> verifier -> stage -> build, with one retry on build failure.
-    # Mirrors __main__._ship_one() so the smoke test exercises the same
-    # resilience the production pipeline has.
+    # generator -> verifier -> static analysis -> stage -> build, with one
+    # retry on build failure. Static analysis is a hard gate: if it fails
+    # the smoke test fails (no retry, per GENERATOR.md v3 failure mode 3).
     for attempt in (1, 2):
-        log.info("smoke: 3/9 generator (attempt %d)", attempt)
+        log.info("smoke: 3/10 generator (attempt %d)", attempt)
         gen = generator.generate(
             archetype="tracker",
             prompt=prompt,
@@ -142,21 +143,31 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
             app_id="smoke",
         )
 
-        log.info("smoke: 4/9 verifier (attempt %d)", attempt)
+        log.info("smoke: 4/10 verifier (attempt %d)", attempt)
         v_out = verify.verify(gen, app_id="smoke")
         log.info("smoke: verifier verdict=%r", v_out.verdict)
 
+        log.info("smoke: 6/10 static analysis (attempt %d)", attempt)
+        sa = security.static_analysis(
+            {"app/page.tsx": v_out.output.page_tsx, "lib/data.ts": v_out.output.data_ts},
+            archetype="tracker",
+        )
+        if not sa.safe:
+            if work is not None and not keep_workdir:
+                shutil.rmtree(work, ignore_errors=True)
+            raise SmokeFailure(f"static analysis stillborn: {sa.reason}")
+
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
-        log.info("smoke: 6/9 stage chassis -> tempdir (attempt %d)", attempt)
+        log.info("smoke: 7/10 stage chassis -> tempdir (attempt %d)", attempt)
         work = _stage(chassis, page_tsx=v_out.output.page_tsx, data_ts=v_out.output.data_ts, readme_md=readme)
 
-        log.info("smoke: 7/9 npm install + next build (attempt %d, workdir=%s)", attempt, work)
+        log.info("smoke: 8/10 npm install + next build (attempt %d, workdir=%s)", attempt, work)
         started = time.monotonic()
         ok, output = _build(work)
         build_seconds = int(time.monotonic() - started)
         if ok:
-            log.info("smoke: 8/9 build ok in %ds (attempt %d)", build_seconds, attempt)
+            log.info("smoke: 9/10 build ok in %ds (attempt %d)", build_seconds, attempt)
             break
         log.warning("smoke: build failed on attempt %d in %ds:\n%s", attempt, build_seconds, output[:600])
         build_err = output
@@ -172,13 +183,14 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
         shutil.rmtree(work, ignore_errors=True)
 
     cost_after = db.today_cost_usd()
-    log.info("smoke: 9/9 done; total cost=$%.4f", cost_after - cost_before)
+    log.info("smoke: 10/10 done; total cost=$%.4f", cost_after - cost_before)
 
     return SmokeResult(
         guard_decision=g.decision,
         matcher_selected=m.selected_archetypes,
         generator_chars=len(v.output.page_tsx) + len(v.output.data_ts),
         verifier_verdict=v.verdict,
+        static_analysis_safe=True,
         build_ok=True,
         build_seconds=build_seconds,
         workdir=work,
