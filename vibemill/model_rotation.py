@@ -136,6 +136,31 @@ def pick_generator(pool: Pool, *, rng: random.Random | None = None) -> ModelChoi
     return r.choices(pool.choices, weights=pool.weights, k=1)[0]
 
 
+def pick_committed(pool: Pool) -> ModelChoice:
+    """Pick the substrate for a committed-path generation.
+
+    Returns the highest-weighted member of the pool whose reasoning_effort
+    is not 'disabled'. If no pool member has reasoning enabled, falls back
+    to the highest-weighted member overall.
+
+    Per ANTI_PATTERNS rule 1 v4, only deliberately-configured reasoning
+    counts as the 'committed' substrate. The default pool has DeepSeek V4
+    Flash at medium effort as the highest-weighted reasoning-enabled
+    member, so that's what fires by default.
+
+    Deterministic (no RNG): the committed path is itself the random sample;
+    its substrate within the path is fixed for fingerprint consistency.
+    """
+    indices = sorted(
+        range(len(pool.choices)),
+        key=lambda i: (-pool.weights[i], i),
+    )
+    for i in indices:
+        if pool.choices[i].reasoning_effort != "disabled":
+            return pool.choices[i]
+    return pool.choices[indices[0]]
+
+
 def pick_excluding(
     pool: Pool, *, exclude: set[str], rng: random.Random | None = None
 ) -> ModelChoice:

@@ -227,6 +227,31 @@ If a generator call returns a rate-limit error from OpenRouter (429 or provider-
 
 Both the generator's slug and the README's slug land in the SQLite `apps` table (columns `generator_model`, `readme_model`, added by migration 003) and mirror to Supabase. **The model identity does NOT appear in the generated app's footer.** Per ANTI_PATTERNS rule 10 (do not advertise the satire), the canonical footer copy from `VOICE.md` is unchanged. Recording the model identity for fingerprint-pattern analysis is operational instrumentation; displaying it in the artifact would turn the app into a self-aware demo.
 
+## Committed-path workflow
+
+Per generation, the orchestrator rolls a single die at probability `COMMITTED_PATH_PROBABILITY` (default 7%). When the die fires, this generation goes through the **committed path**:
+
+1. **Force the substrate.** Generator + verifier use the highest-weighted reasoning-enabled member of the pool (DeepSeek V4 Flash at medium reasoning by default). README still rotation-matched to the (forced) generator slug.
+2. **Stuff article context.** Orchestrator fetches the source URL and appends the first `COMMITTED_PATH_ARTICLE_CHARS` (default 2000) of stripped HTML text to the generator prompt. Best-effort: any fetch failure (timeout, non-2xx, non-text content) silently falls back to no extra context.
+3. **Raise the build-retry cap.** Up to `COMMITTED_PATH_BUILD_ATTEMPTS` (default 4) build attempts before stillborn, vs. 2 on the regular path.
+4. **Persist the flag.** `apps.committed_path = true` so the cemetery (V1+) can show the corpus split.
+
+### Why this is faithful, not score-routing
+
+The dice roll is **independent of input score** (matcher, guard, archetype, headline content — all uncorrelated with the roll). The substrate distribution claim from rule 5 v4 is preserved: low-quality news still has the same chance as high-quality news of being committed-path-sampled.
+
+The committed-QA cohort is real: a measurable subset of vibecoders DO ground via article-stuffing, debug-iterate 2-3x, and pick a stronger model. Refusing to sample them in the corpus would be its own distortion of the producer population. Routing based on input quality (the original brief that got pushed back) is what would violate rule 5 v4. Random sampling does not.
+
+### What the committed path is NOT
+
+- It is **not** a quality gate that filters out bad apps. The verifier's "looks good" attestation is unchanged. Most committed-path apps will still be slop; the artifact is the random distribution of effort, not curated quality.
+- It is **not** a tier system. There's no "premium" output. Committed-path apps still ship with the same footer disclaimer, the same naming pool, the same retirement policy.
+- It is **not** advertised in the artifact. Per rule 10, the committed_path flag stays in the SQLite/Supabase records; the generated app does not announce its workflow.
+
+### Cost implications
+
+A committed-path generation is ~3x the regular cost: deepseek-v4-flash at medium reasoning runs ~$0.84/M effective vs ~$0.28/M nominal, plus up to 4 attempts vs 2 on average means more build retries. At 7% sampling and ~5 apps/tick, expect ~1 committed app every 3 ticks. Daily extra cost: ~$0.05-0.10. Well within the $5/day cap.
+
 ## Operational metrics to track
 
 Logged to SQLite for internal use:

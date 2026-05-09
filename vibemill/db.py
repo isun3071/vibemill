@@ -77,6 +77,10 @@ class App(SQLModel, table=True):
     # in the artifact (per ANTI_PATTERNS rule 10).
     generator_model: str | None = None
     readme_model: str | None = None
+    # Added by migration 004. True iff this app went through the committed-
+    # path workflow (random 7% sample with article-stuffed context, forced
+    # reasoning-enabled model, raised build-retry cap). See OPERATIONS.md.
+    committed_path: int = 0
 
 
 class Rejection(SQLModel, table=True):
@@ -228,6 +232,7 @@ def insert_app(record: AppRecord) -> None:
         verifier_notes=record.verifier_notes,
         generator_model=record.generator_model,
         readme_model=record.readme_model,
+        committed_path=1 if record.committed_path else 0,
     )
     with session() as s:
         s.add(row)

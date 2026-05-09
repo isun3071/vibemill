@@ -123,6 +123,21 @@ def assert_model_rotation_columns() -> None:
     )
 
 
+def assert_committed_path_column() -> None:
+    """Verify migration 004 (committed_path boolean) has been applied to
+    the Supabase apps table. Same probe pattern as the others."""
+    url = f"{_base()}/rest/v1/apps?select=committed_path&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 004 (committed_path) is missing on the Supabase apps "
+        f"table. HTTP {r.status_code}: {r.text[:200]}. Apply "
+        "migrations/supabase/004_add_committed_path_column.sql manually "
+        "in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

@@ -89,6 +89,7 @@ def generate(
     source_summary: str,
     model: ModelChoice,
     previous_build_error: str | None = None,
+    extra_context: str | None = None,
     app_id: str | None = None,
 ) -> GeneratorOutput:
     """Run the generator. One retry on malformed JSON.
@@ -106,6 +107,14 @@ def generate(
         source_headline=source_headline,
         source_summary=source_summary,
     )
+    if extra_context:
+        user_prompt += (
+            "\n\nAdditional source material (excerpt from the news article):\n"
+            + extra_context
+            + "\n\nUse this for richer hardcoded data values and copy. The "
+            "data still ships baked into lib/data.ts; this excerpt is just "
+            "build-time context for you."
+        )
     if previous_build_error:
         user_prompt += (
             "\n\nYour previous output produced a build error. Here is the error:\n"

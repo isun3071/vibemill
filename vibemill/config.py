@@ -44,6 +44,19 @@ class Settings(BaseSettings):
     README_ROTATION_MODE: str = "match_generator"  # match_generator | fixed
     MAX_OUTPUT_PRICE_USD_PER_M: float = 2.00
 
+    # Probability per generation that the committed-QA path fires. Default 7%
+    # samples the real-vibecoder cohort that grounds via article-stuffing,
+    # debug-iterates 2-3x, and picks a higher-effort model. Independent of
+    # input score (per ANTI_PATTERNS rule 5 v4 + the substrate-rotation
+    # fairness claim). See OPERATIONS.md "Committed-path workflow".
+    COMMITTED_PATH_PROBABILITY: float = 0.07
+    # When the committed path fires, allow this many build attempts before
+    # marking stillborn (vs. 2 on the regular path). Counts the first attempt.
+    COMMITTED_PATH_BUILD_ATTEMPTS: int = 4
+    # First N chars of the source article URL to fetch and stuff into the
+    # generator prompt on the committed path. 0 disables fetching.
+    COMMITTED_PATH_ARTICLE_CHARS: int = 2000
+
     # GitHub
     GITHUB_TOKEN: SecretStr = SecretStr("")
     GITHUB_ORG: str = "vibemill-apps"

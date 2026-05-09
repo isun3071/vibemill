@@ -172,6 +172,7 @@ class AppRecord(BaseModel):
     verifier_notes: str | None = None
     generator_model: str | None = None
     readme_model: str | None = None
+    committed_path: bool = False
 
 
 class RejectionRecord(BaseModel):

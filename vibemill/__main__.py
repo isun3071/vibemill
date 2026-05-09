@@ -139,6 +139,44 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
 # ============================================================================
 
 
+_ARTICLE_FETCH_TIMEOUT_S = 10
+
+
+def _fetch_article_excerpt(url: str, max_chars: int) -> str:
+    """Best-effort fetch of the source article URL for committed-path
+    context-stuffing. Returns up to `max_chars` of stripped text, or empty
+    string on any failure (network error, non-2xx, binary content, etc.).
+
+    Strips HTML tags crudely; the LLM tolerates noisy excerpts. We do not
+    use a full HTML parser to keep deps minimal.
+    """
+    if max_chars <= 0:
+        return ""
+    try:
+        import re as _re
+
+        import httpx as _httpx
+        r = _httpx.get(
+            url,
+            timeout=_ARTICLE_FETCH_TIMEOUT_S,
+            follow_redirects=True,
+            headers={"user-agent": "vibemill/0.5 (+https://vibemill.dev)"},
+        )
+        if r.status_code != 200:
+            return ""
+        ctype = r.headers.get("content-type", "")
+        if "html" not in ctype and "text" not in ctype:
+            return ""
+        text = _re.sub(r"<script[\s\S]*?</script>", " ", r.text, flags=_re.IGNORECASE)
+        text = _re.sub(r"<style[\s\S]*?</style>", " ", text, flags=_re.IGNORECASE)
+        text = _re.sub(r"<[^>]+>", " ", text)
+        text = _re.sub(r"\s+", " ", text).strip()
+        return text[:max_chars]
+    except Exception as exc:
+        log.warning("article fetch failed for %s: %s", url, exc)
+        return ""
+
+
 def _is_rate_limit_error(exc: BaseException) -> bool:
     """Crude detection of OpenRouter rate-limit errors that escaped retry."""
     msg = str(exc).lower()
@@ -153,6 +191,7 @@ def _generate_with_rate_limit_retry(
     prompt: str,
     item: NewsItem,
     previous_build_error: str | None,
+    extra_context: str | None,
     app_id: str,
 ) -> tuple[GeneratorOutput, ModelChoice]:
     """Run generator.generate(); on rate-limit error, re-roll the model
@@ -167,6 +206,7 @@ def _generate_with_rate_limit_retry(
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=previous_build_error,
+            extra_context=extra_context,
             model=chosen,
             app_id=app_id,
         )
@@ -186,6 +226,7 @@ def _generate_with_rate_limit_retry(
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=previous_build_error,
+            extra_context=extra_context,
             model=replacement,
             app_id=app_id,
         )
@@ -275,18 +316,35 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         source_summary=item.summary,
     )
 
-    # Pick the substrate for this app. Verifier shares the generator's choice
-    # so the within-app fingerprint is coherent. README defaults to match the
-    # generator (so the app feels like one human used one tool for both code
-    # and copy); fixed mode pins to README_MODEL. README pick happens AFTER
-    # the generator runs so a rate-limit re-roll on the generator carries
-    # through to the README.
-    gen_model = model_rotation.pick_generator(pool)
-    log.info(
-        "==> SHIPPING %s | archetype=tracker score=%d | generator=%s reasoning=%s | headline=%r",
-        app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
-        item.headline[:120],
-    )
+    # Roll the committed-path dice INDEPENDENT of input score. ~7% of
+    # generations sample the real-vibecoder cohort that grounds via
+    # article-stuffing, debug-iterates 2-3x, and uses a higher-effort
+    # model. See OPERATIONS.md "Committed-path workflow" and ANTI_PATTERNS
+    # rule 5 v4. The substrate distribution claim is preserved: committed
+    # path firing is uncorrelated with input quality.
+    import random as _random
+    committed_path = _random.random() < settings.COMMITTED_PATH_PROBABILITY
+
+    if committed_path:
+        gen_model = model_rotation.pick_committed(pool)
+        max_build_attempts = settings.COMMITTED_PATH_BUILD_ATTEMPTS
+        article_excerpt = _fetch_article_excerpt(
+            item.url, settings.COMMITTED_PATH_ARTICLE_CHARS
+        )
+        log.info(
+            "==> SHIPPING %s [COMMITTED PATH] | archetype=tracker score=%d | generator=%s reasoning=%s | article_chars=%d | retries=%d | headline=%r",
+            app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+            len(article_excerpt), max_build_attempts - 1, item.headline[:120],
+        )
+    else:
+        gen_model = model_rotation.pick_generator(pool)
+        max_build_attempts = 2
+        article_excerpt = ""
+        log.info(
+            "==> SHIPPING %s | archetype=tracker score=%d | generator=%s reasoning=%s | headline=%r",
+            app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+            item.headline[:120],
+        )
     started = datetime.now(timezone.utc)
 
     # 3. Generate -> verify -> static analysis -> build, with one retry on build
@@ -303,7 +361,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     build_err: str | None = None
     forbidden_result: security.StaticAnalysisResult | None = None
 
-    for attempt in (1, 2):
+    for attempt in range(1, max_build_attempts + 1):
         try:
             gen_out, gen_model = _generate_with_rate_limit_retry(
                 pool=pool,
@@ -312,6 +370,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
                 prompt=prompt,
                 item=item,
                 previous_build_error=build_err,
+                extra_context=article_excerpt or None,
                 app_id=app_id,
             )
         except generator.GeneratorJSONError as exc:
@@ -373,6 +432,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
+            committed_path=committed_path,
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -400,6 +460,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
+            committed_path=committed_path,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -428,6 +489,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
+            committed_path=committed_path,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -461,6 +523,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
+            committed_path=committed_path,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -495,6 +558,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         verifier_notes=verify_outcome.notes,
         generator_model=gen_model.slug,
         readme_model=(readme_model.slug if readme_model else None),
+        committed_path=committed_path,
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",
