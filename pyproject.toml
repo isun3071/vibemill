@@ -53,3 +53,6 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "smoke: end-to-end LLM + build test (slow, costs money; opt-in via -m smoke)",
+]
