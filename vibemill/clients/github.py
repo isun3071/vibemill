@@ -99,8 +99,11 @@ def repo_https_url(name: str) -> str:
     return f"https://github.com/{s.GITHUB_ORG}/{name}"
 
 
-def _push_url_with_token(name: str) -> str:
-    """A one-shot HTTPS URL with the token embedded for `git push`."""
+def push_url_with_token(name: str) -> str:
+    """A one-shot HTTPS URL with the token embedded for `git push`.
+
+    Use only as the URL argument to `git push`; never write it to .git/config.
+    """
     s = get_settings()
     token = s.GITHUB_TOKEN.get_secret_value()
     return f"https://x-access-token:{token}@github.com/{s.GITHUB_ORG}/{name}.git"
@@ -126,7 +129,7 @@ def push_directory(
     repo.git.add(A=True)
     commit = repo.index.commit(commit_message, author=MILL_AUTHOR, committer=MILL_AUTHOR)
 
-    push_url = _push_url_with_token(name)
+    push_url = push_url_with_token(name)
     # Use a one-shot push without persisting the token-bearing URL.
     repo.git.push(push_url, f"HEAD:{branch}")
     return commit.hexsha
