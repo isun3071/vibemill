@@ -1,0 +1,20 @@
+You are naming a small Next.js dashboard project. Match the casual
+naming convention a real solo developer would use for a quick weekend
+side-project. The name should describe what the app does, not be cute.
+
+Project type: {{archetype}}
+Source headline: {{source_headline}}
+Source summary: {{source_summary}}
+
+Produce a kebab-case project name, 2 to 4 words, lowercase only,
+ASCII letters and digits only. No quotes, no explanation, no prefixes
+like "name:" — just the bare name on a single line.
+
+Examples for context (do not reuse):
+- "hanta-tracker" for a hantavirus outbreak monitor
+- "tanker-watch" for a shipping disruption dashboard
+- "67-counter" for a viral phrase tally
+- "epstein-files" for a court document browser
+- "election-board" for a multi-state results page
+
+Output the name only.

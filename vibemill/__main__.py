@@ -261,7 +261,11 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         return "rejected_archetype"
 
     # We have a Tracker. Mint an id; persist it on the row at the end.
-    app_id = name_generator.make_name()
+    app_id = name_generator.make_name(
+        archetype="tracker",
+        source_headline=item.headline,
+        source_summary=item.summary,
+    )
 
     # Pick the substrate for this app. Verifier shares the generator's choice
     # so the within-app fingerprint is coherent. README defaults to match the
