@@ -84,6 +84,26 @@ def upsert_rows(table: str, rows: list[dict[str, Any]], *, on_conflict: str = "i
         raise SupabaseError(f"upsert {table} ({len(rows)} rows): HTTP {r.status_code}: {r.text[:400]}")
 
 
+def assert_verifier_columns() -> None:
+    """Verify migration 002 has been applied to the Supabase apps table.
+
+    PostgREST has no information_schema endpoint, so we probe the columns by
+    attempting a select. If verifier_verdict + verifier_notes exist, returns
+    200 with an empty body. If either is missing, returns 400 with the
+    column name in the error.
+    """
+    url = f"{_base()}/rest/v1/apps?select=verifier_verdict,verifier_notes&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 002 (verifier_verdict + verifier_notes) is missing on the "
+        f"Supabase apps table. HTTP {r.status_code}: {r.text[:200]}. "
+        "Apply migrations/supabase/002_add_verifier_columns_supabase.sql "
+        "manually in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 
