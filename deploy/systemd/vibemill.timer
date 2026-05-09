@@ -1,0 +1,14 @@
+[Unit]
+Description=Vibe Mill hourly cron tick
+
+[Timer]
+# Run on a flexible 1-hour schedule. RandomizedDelaySec adds up to 5 minutes
+# of jitter so we are not hitting external APIs on the dot every hour.
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=vibemill.service
+
+[Install]
+WantedBy=timers.target

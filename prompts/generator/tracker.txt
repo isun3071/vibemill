@@ -1,0 +1,44 @@
+You are generating a Next.js 14 (App Router) page for a satirical
+news-tracker app called Vibe Mill. The app is a Tracker archetype:
+a small dashboard showing quantitative state of an ongoing event.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+Your output produces two files. The chassis (layout, components,
+config) already exists; do not produce those.
+
+Produce in JSON only, with two keys:
+
+{
+  "page_tsx": "the full content of app/page.tsx",
+  "data_ts": "the full content of lib/data.ts"
+}
+
+Constraints for app/page.tsx:
+- Use the App Router (this is a Server Component by default; do not add "use client" unless a child component requires it)
+- Import primitives from @/lib/components: Counter, MapPanel, Timeline, NewsList
+- Import data from @/lib/data
+- Render: a header section with title and tagline, a main grid containing Counter cards, a MapPanel section, a Timeline section, and a NewsList section
+- Use Tailwind utility classes only; no custom CSS
+- Do NOT include a footer disclaimer in page.tsx; the chassis layout renders the disclaimer
+
+Constraints for lib/data.ts:
+- Export typed objects: title (string), tagline (string), counters (array), regions (array), timelineEvents (array), newsItems (array)
+- Counter shape: { label: string, value: number | string, sublabel?: string }
+- Region shape: { name: string, status: "active" | "monitoring" | "resolved" | "unknown", value?: number }
+- TimelineEvent shape: { date: string (ISO), title: string, description: string }
+- NewsItem shape: { source: string, headline: string, url: string, publishedAt: string (ISO) }
+- Hardcode reasonable values based on the source context
+- Do not fetch external data; the data is baked in at build time
+- Include between 3 and 6 counters, 5 to 12 regions, 4 to 10 timeline events, 3 to 6 news items
+
+Style:
+- Visually polished surface (good spacing hierarchy and color contrast)
+- The app should build cleanly with `next build` against the chassis
+- Functional logic: dashboards display the data; clicking elements does not need to do anything interesting but must not crash
+
+Output the JSON object only. No prose before or after.

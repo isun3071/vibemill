@@ -1,0 +1,54 @@
+# Vibe Mill .gitignore
+
+# Secrets and env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local data (source of truth lives here, but stays local)
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Node / Next.js (for public-site/ and generated apps' chassis)
+node_modules/
+.next/
+.vercel/
+out/
+
+# Playwright
+playwright-cache/
+playwright-report/
+test-results/
+
+# Logs
+*.log
+logs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts and tempdirs
+/tmp/vibemill-build-*/
+.uv-cache/

@@ -1,0 +1,13 @@
+[Unit]
+Description=Vibe Mill daily rotation timer
+
+[Timer]
+# Fire at midnight local time every day. Persistent ensures it catches up
+# on the next boot if sunfamily was offline at the scheduled time.
+OnCalendar=*-*-* 00:00:00
+RandomizedDelaySec=2min
+Persistent=true
+Unit=vibemill-rotate.service
+
+[Install]
+WantedBy=timers.target
