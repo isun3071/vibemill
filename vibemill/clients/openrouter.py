@@ -119,18 +119,30 @@ def complete(
     temperature: float = 0.0,
     max_tokens: int | None = None,
     response_format_json: bool = False,
+    reasoning_effort: str = "disabled",
     app_id: str | None = None,
 ) -> Completion:
     """Send a chat completion request, record cost, return parsed response.
 
     `response_format_json=True` asks OpenRouter for `response_format=json_object`
     where the model supports it; the orchestrator still validates JSON itself.
+
+    `reasoning_effort` is sent explicitly on every call so reasoning-enabled
+    defaults on some routes do not silently turn on. Per ANTI_PATTERNS rule 1
+    v4, reasoning is allowed where deliberately configured (currently:
+    DeepSeek V4 Flash at medium effort, all other generator pool members
+    and all non-generator stages disabled). Values: disabled | low | medium | high.
     """
     opts: dict[str, Any] = {"temperature": temperature}
     if max_tokens is not None:
         opts["max_tokens"] = max_tokens
     if response_format_json:
         opts["response_format"] = {"type": "json_object"}
+    opts["reasoning"] = (
+        {"enabled": False}
+        if reasoning_effort == "disabled"
+        else {"effort": reasoning_effort}
+    )
 
     try:
         body, elapsed_ms = _post_chat(model=model, messages=messages, opts=opts)

@@ -36,7 +36,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import db, generator, guard, matcher, readme_writer, security, verify
+from . import db, generator, guard, matcher, model_rotation, readme_writer, security, verify
 from .config import get_settings
 from .models import NewsItem
 
@@ -136,12 +136,20 @@ def _run_happy_pipeline(
     prompt = f"{item.headline}. {item.summary}".strip()
     fixture = result.fixture
 
+    # Use the first pool member for reproducibility of the smoke test. Real
+    # rotation distribution is verified by scripts/verify_rotation.py
+    # (statistical) and by manual end-to-end runs.
+    pool = model_rotation.parse_pool()
+    smoke_model = pool.choices[0]
+    log.info("[%s] using model=%s reasoning=%s", fixture, smoke_model.slug, smoke_model.reasoning_effort)
+
     log.info("[%s] 5/10 readme", fixture)
     readme = readme_writer.write(
         app_name="smoke-test-tracker",
         prompt=prompt,
         archetype="tracker",
         source_headline=item.headline,
+        model=smoke_model,
         app_id=f"smoke-{fixture}",
     )
 
@@ -159,11 +167,12 @@ def _run_happy_pipeline(
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=build_err,
+            model=smoke_model,
             app_id=f"smoke-{fixture}",
         )
 
         log.info("[%s] 4/10 verifier (attempt %d)", fixture, attempt)
-        v_out = verify.verify(gen, app_id=f"smoke-{fixture}")
+        v_out = verify.verify(gen, model=smoke_model, app_id=f"smoke-{fixture}")
         log.info("[%s] verifier verdict=%r", fixture, v_out.verdict)
 
         log.info("[%s] 6/10 static analysis (attempt %d)", fixture, attempt)

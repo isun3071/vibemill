@@ -71,6 +71,7 @@ def _read_table(con: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
 def push() -> SnapshotCounts:
     """Mirror the three public tables to Supabase. Returns row counts pushed."""
     supabase.assert_verifier_columns()  # confirms migration 002 on remote
+    supabase.assert_model_rotation_columns()  # confirms migration 003 on remote
 
     con = _connect()
     try:

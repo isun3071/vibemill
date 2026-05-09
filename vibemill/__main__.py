@@ -37,6 +37,7 @@ from . import (
     guard,
     ingest,
     matcher,
+    model_rotation,
     name_generator,
     readme_writer,
     retire,
@@ -46,8 +47,9 @@ from . import (
     vercel_deploy,
     verify,
 )
-from .clients import supabase
+from .clients import openrouter, supabase
 from .config import get_settings
+from .model_rotation import ModelChoice, ModelRotationError, Pool
 from .models import (
     AppRecord,
     GeneratorOutput,
@@ -129,12 +131,65 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
 # ============================================================================
 
 
-def _ship_one(item: NewsItem) -> str:
+def _is_rate_limit_error(exc: BaseException) -> bool:
+    """Crude detection of OpenRouter rate-limit errors that escaped retry."""
+    msg = str(exc).lower()
+    return "429" in msg or "rate limit" in msg or "rate-limit" in msg
+
+
+def _generate_with_rate_limit_retry(
+    *,
+    pool: Pool,
+    chosen: ModelChoice,
+    archetype: str,
+    prompt: str,
+    item: NewsItem,
+    previous_build_error: str | None,
+    app_id: str,
+) -> tuple[GeneratorOutput, ModelChoice]:
+    """Run generator.generate(); on rate-limit error, re-roll the model
+    once excluding the failed slug and retry. Returns (output, model_used).
+    Re-raises any non-rate-limit error and any rate-limit error on the retry.
+    """
+    try:
+        out = generator.generate(
+            archetype=archetype,
+            prompt=prompt,
+            source_url=item.url,
+            source_headline=item.headline,
+            source_summary=item.summary,
+            previous_build_error=previous_build_error,
+            model=chosen,
+            app_id=app_id,
+        )
+        return out, chosen
+    except (openrouter.OpenRouterError, Exception) as exc:
+        if not _is_rate_limit_error(exc):
+            raise
+        replacement = model_rotation.pick_excluding(pool, exclude={chosen.slug})
+        log.warning(
+            "%s: generator rate-limited on %s; re-rolling to %s",
+            app_id, chosen.slug, replacement.slug,
+        )
+        out = generator.generate(
+            archetype=archetype,
+            prompt=prompt,
+            source_url=item.url,
+            source_headline=item.headline,
+            source_summary=item.summary,
+            previous_build_error=previous_build_error,
+            model=replacement,
+            app_id=app_id,
+        )
+        return out, replacement
+
+
+def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     """Process one news item all the way to a live Vercel URL or a logged
     rejection / stillborn marker. Returns one of:
         'shipped' | 'rejected_guard' | 'rejected_matcher' | 'rejected_archetype'
         | 'stillborn_build' | 'stillborn_publish' | 'stillborn_deploy'
-        | 'screenshot_missing'  (still shipped)
+        | 'stillborn_forbidden' | 'screenshot_missing'  (last is still shipped)
     """
     settings = get_settings()
     prompt = f"{item.headline}. {item.summary}".strip()
@@ -207,41 +262,57 @@ def _ship_one(item: NewsItem) -> str:
 
     # We have a Tracker. Mint an id; persist it on the row at the end.
     app_id = name_generator.make_name()
-    log.info("shipping %s (archetype=tracker, score=%d)", app_id, m.scores.tracker)
+
+    # Pick the substrate for this app. Verifier shares the generator's choice
+    # so the within-app fingerprint is coherent. README defaults to match the
+    # generator (so the app feels like one human used one tool for both code
+    # and copy); fixed mode pins to README_MODEL. README pick happens AFTER
+    # the generator runs so a rate-limit re-roll on the generator carries
+    # through to the README.
+    gen_model = model_rotation.pick_generator(pool)
+    log.info(
+        "shipping %s (archetype=tracker, score=%d, generator=%s reasoning=%s)",
+        app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+    )
     started = datetime.now(timezone.utc)
 
     # 3. Generate -> verify -> static analysis -> build, with one retry on build
     # failure (per GENERATOR.md v3). Static analysis is a hard gate with NO
     # retry: a forbidden pattern is a policy violation, not a transient error.
+    # Generator gets one rate-limit re-roll to a different pool member.
     chassis_dir = settings.archetypes_dir / "tracker" / "chassis"
     work: Path | None = None
     gen_out: GeneratorOutput | None = None
     verify_outcome = None
     readme_md = ""
+    readme_model: ModelChoice | None = None
     build_ok = False
     build_err: str | None = None
     forbidden_result: security.StaticAnalysisResult | None = None
 
     for attempt in (1, 2):
         try:
-            gen_out = generator.generate(
+            gen_out, gen_model = _generate_with_rate_limit_retry(
+                pool=pool,
+                chosen=gen_model,
                 archetype="tracker",
                 prompt=prompt,
-                source_url=item.url,
-                source_headline=item.headline,
-                source_summary=item.summary,
+                item=item,
                 previous_build_error=build_err,
                 app_id=app_id,
             )
         except generator.GeneratorJSONError as exc:
             log.warning("%s: generator JSON error: %s", app_id, exc)
             break
-        verify_outcome = verify.verify(gen_out, app_id=app_id)
+        verify_outcome = verify.verify(gen_out, model=gen_model, app_id=app_id)
+        readme_model = model_rotation.pick_readme(gen_model)
+        log.info("%s: readme=%s", app_id, readme_model.slug)
         readme_md = readme_writer.write(
             app_name=app_id,
             prompt=prompt,
             archetype="tracker",
             source_headline=item.headline,
+            model=readme_model,
             app_id=app_id,
         )
         if work is not None:
@@ -286,6 +357,8 @@ def _ship_one(item: NewsItem) -> str:
             generation_seconds=elapsed,
             verifier_verdict=(verify_outcome.verdict if verify_outcome else None),
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
+            generator_model=gen_model.slug,
+            readme_model=(readme_model.slug if readme_model else None),
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -311,6 +384,8 @@ def _ship_one(item: NewsItem) -> str:
             generation_seconds=elapsed,
             verifier_verdict=(verify_outcome.verdict if verify_outcome else None),
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
+            generator_model=gen_model.slug,
+            readme_model=(readme_model.slug if readme_model else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -337,6 +412,8 @@ def _ship_one(item: NewsItem) -> str:
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
+            generator_model=gen_model.slug,
+            readme_model=(readme_model.slug if readme_model else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -362,6 +439,8 @@ def _ship_one(item: NewsItem) -> str:
             github_url=publish_result.html_url,
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
+            generator_model=gen_model.slug,
+            readme_model=(readme_model.slug if readme_model else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -394,6 +473,8 @@ def _ship_one(item: NewsItem) -> str:
         status="live",
         verifier_verdict=verify_outcome.verdict,
         verifier_notes=verify_outcome.notes,
+        generator_model=gen_model.slug,
+        readme_model=(readme_model.slug if readme_model else None),
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",
@@ -422,6 +503,19 @@ def run_tick() -> TickResult:
         return TickResult(0, 0, 0, skipped_cost_cap=True)
     log.info("tick start: today_cost=$%.4f cap=$%.4f", spent, cap)
 
+    # Validate the generator pool against OpenRouter's catalog before doing
+    # anything expensive. Catches: missing slugs (model retired, typo in
+    # .env), and effective output cost (nominal x reasoning multiplier)
+    # exceeding MAX_OUTPUT_PRICE_USD_PER_M. Fails the tick clean if so;
+    # operator fixes .env and re-runs.
+    try:
+        pool = model_rotation.parse_pool()
+        model_rotation.validate_pool_pricing(pool)
+    except ModelRotationError as exc:
+        log.error("model rotation pool invalid; aborting tick: %s", exc)
+        audit.event(audit.ORCHESTRATOR, "tick.abort", reason=f"pool invalid: {exc}")
+        return TickResult(0, 0, 0, skipped_cost_cap=False)
+
     items = ingest.fetch_new_items()
     if not items:
         log.info("tick: no new items")
@@ -435,7 +529,7 @@ def run_tick() -> TickResult:
             log.info("tick: hit MAX_APPS_PER_TICK=%d, deferring rest to next tick", MAX_APPS_PER_TICK)
             break
         try:
-            outcome = _ship_one(item)
+            outcome = _ship_one(item, pool=pool)
         except Exception as exc:
             log.exception("unexpected error processing %s: %s", item.url, exc)
             continue

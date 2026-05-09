@@ -68,6 +68,7 @@ def check(input_text: str, *, app_id: str | None = None) -> GuardResult:
         purpose="guard",
         temperature=0.0,
         response_format_json=True,
+        reasoning_effort="disabled",
         app_id=app_id,
         max_tokens=200,
     )
@@ -95,6 +96,7 @@ def check(input_text: str, *, app_id: str | None = None) -> GuardResult:
             purpose="guard",
             temperature=0.0,
             response_format_json=True,
+            reasoning_effort="disabled",
             app_id=app_id,
             max_tokens=200,
         )

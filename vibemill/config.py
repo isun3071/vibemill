@@ -31,8 +31,18 @@ class Settings(BaseSettings):
 
     GUARD_MODEL: str = "anthropic/claude-haiku-4.5"
     MATCHER_MODEL: str = "anthropic/claude-haiku-4.5"
-    GENERATOR_MODEL: str = "deepseek/deepseek-chat-v3"
-    README_MODEL: str = "anthropic/claude-haiku-4.5"
+    GENERATOR_MODEL: str = "deepseek/deepseek-chat-v3"  # legacy single-model knob; rotation pool below supersedes
+    README_MODEL: str = "anthropic/claude-haiku-4.5"  # used only when README_ROTATION_MODE=fixed
+
+    # Generator + README model rotation. See vibemill/model_rotation.py and
+    # OPERATIONS.md "Generator substrate composition". Three parallel
+    # comma-separated lists; lengths must match. Weights must sum to 1.0.
+    # Reasoning efforts: disabled | low | medium | high.
+    GENERATOR_MODELS: str = "deepseek/deepseek-chat-v3"
+    GENERATOR_WEIGHTS: str = "1.0"
+    GENERATOR_REASONING_EFFORTS: str = "disabled"
+    README_ROTATION_MODE: str = "match_generator"  # match_generator | fixed
+    MAX_OUTPUT_PRICE_USD_PER_M: float = 2.00
 
     # GitHub
     GITHUB_TOKEN: SecretStr = SecretStr("")

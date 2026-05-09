@@ -72,11 +72,11 @@ If you find yourself wanting to build any of the above, **stop and ask the user.
 
 Read `ANTI_PATTERNS.md` for the full list. The headline rules:
 
-- Do not switch to reasoning models for codegen — DeepSeek V3 chat is correct
+- Reasoning model use must be deliberate, not default (rule 1 v4: only DeepSeek V4 Flash within the generator pool runs reasoning, at medium effort; all other pool members and stages have it disabled)
 - Do not improve the verification prompt — its shallowness is the satire
 - Do not add hallucination suppression, fact-checking, or grounding
 - Do not lower temperature on the generator below 0.7
-- Do not filter visibly-broken outputs — they are the receipts
+- Do not filter visibly-broken outputs — they are the receipts (rule 5 v4); DO sample substrate variance via the configured generator + README pool
 - Do not add post-deployment error monitoring on generated apps
 - Do not "tighten" the readme persona — its tells are deliberate
 - Do not advertise the satire in user-facing copy

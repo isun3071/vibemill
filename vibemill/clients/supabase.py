@@ -104,6 +104,25 @@ def assert_verifier_columns() -> None:
     )
 
 
+def assert_model_rotation_columns() -> None:
+    """Verify migration 003 has been applied to the Supabase apps table.
+
+    Same probe pattern as assert_verifier_columns. If generator_model +
+    readme_model exist, returns 200 with an empty body. If either is missing,
+    returns 400 with the column name in the error.
+    """
+    url = f"{_base()}/rest/v1/apps?select=generator_model,readme_model&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 003 (generator_model + readme_model) is missing on the "
+        f"Supabase apps table. HTTP {r.status_code}: {r.text[:200]}. "
+        "Apply migrations/supabase/003_add_model_rotation_columns.sql "
+        "manually in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

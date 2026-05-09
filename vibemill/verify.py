@@ -27,6 +27,7 @@ from pydantic import ValidationError
 
 from .clients import openrouter
 from .config import get_settings
+from .model_rotation import ModelChoice
 from .models import GeneratorOutput, VerifierLLMResult
 
 log = logging.getLogger(__name__)
@@ -71,13 +72,14 @@ def _extract_json(text: str) -> dict:
     raise ValueError("no JSON object found in response")
 
 
-def _call(user_prompt: str, *, app_id: str | None) -> str:
+def _call(user_prompt: str, *, model: ModelChoice, app_id: str | None) -> str:
     completion = openrouter.complete(
-        model=get_settings().GENERATOR_MODEL,
+        model=model.slug,
         messages=[{"role": "user", "content": user_prompt}],
-        purpose="generator",  # verifier shares the generator model bucket
+        purpose="generator",  # verifier shares the generator model bucket in the cost ledger
         temperature=VERIFIER_TEMPERATURE,
         response_format_json=True,
+        reasoning_effort=model.reasoning_effort,
         app_id=app_id,
         max_tokens=_MAX_TOKENS,
     )
@@ -98,16 +100,21 @@ def _normalize_verdict(raw: str) -> str:
     return VERDICT_LOOKS_GOOD
 
 
-def verify(generated: GeneratorOutput, *, app_id: str | None = None) -> VerifyOutcome:
-    """Run the verification pass. Always returns; never raises."""
+def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None = None) -> VerifyOutcome:
+    """Run the verification pass. Always returns; never raises.
+
+    `model` is the same ModelChoice the generator used for this app; the
+    verifier shares the substrate so the within-app fingerprint is coherent
+    (one substrate produces both the code and the verifier's attestation).
+    """
     user_prompt = _load_prompt().replace("{{generated_files}}", _format_files(generated))
 
-    text = _call(user_prompt, app_id=app_id)
+    text = _call(user_prompt, model=model, app_id=app_id)
     try:
         parsed = VerifierLLMResult.model_validate(_extract_json(text))
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         log.warning("verify: malformed JSON, retrying once: %s | text=%r", exc, text[:300])
-        text2 = _call(user_prompt, app_id=app_id)
+        text2 = _call(user_prompt, model=model, app_id=app_id)
         try:
             parsed = VerifierLLMResult.model_validate(_extract_json(text2))
         except (json.JSONDecodeError, ValueError, ValidationError) as exc2:

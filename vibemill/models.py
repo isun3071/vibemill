@@ -166,6 +166,8 @@ class AppRecord(BaseModel):
     retired_at: datetime | None = None
     verifier_verdict: str | None = None
     verifier_notes: str | None = None
+    generator_model: str | None = None
+    readme_model: str | None = None
 
 
 class RejectionRecord(BaseModel):

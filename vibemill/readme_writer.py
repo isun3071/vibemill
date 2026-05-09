@@ -17,6 +17,7 @@ import logging
 
 from .clients import openrouter
 from .config import get_settings
+from .model_rotation import ModelChoice
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +43,16 @@ def write(
     app_name: str,
     prompt: str,
     archetype: str,
+    model: ModelChoice,
     source_headline: str = "",
     app_id: str | None = None,
 ) -> str:
-    """Produce the README.md text for one app. Returns the markdown string."""
+    """Produce the README.md text for one app. Returns the markdown string.
+
+    `model` is the README's substrate, picked by model_rotation.pick_readme().
+    Per match_generator mode (default), this matches the app's generator
+    model so the README and the code feel like one human used one tool.
+    """
     user_prompt = _render(
         _load_template(),
         app_name=app_name,
@@ -54,10 +61,11 @@ def write(
         source_headline=source_headline,
     )
     completion = openrouter.complete(
-        model=get_settings().README_MODEL,
+        model=model.slug,
         messages=[{"role": "user", "content": user_prompt}],
         purpose="readme",
         temperature=0.7,
+        reasoning_effort=model.reasoning_effort,
         app_id=app_id,
         max_tokens=2000,
     )

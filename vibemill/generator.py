@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from .clients import openrouter
 from .config import get_settings
+from .model_rotation import ModelChoice
 from .models import GeneratorOutput
 
 log = logging.getLogger(__name__)
@@ -65,13 +66,14 @@ def _extract_json(text: str) -> dict:
     raise ValueError("no JSON object found in response")
 
 
-def _call(messages: list[dict], *, app_id: str | None) -> str:
+def _call(messages: list[dict], *, model: ModelChoice, app_id: str | None) -> str:
     completion = openrouter.complete(
-        model=get_settings().GENERATOR_MODEL,
+        model=model.slug,
         messages=messages,
         purpose="generator",
         temperature=GENERATOR_TEMPERATURE,
         response_format_json=True,
+        reasoning_effort=model.reasoning_effort,
         app_id=app_id,
         max_tokens=_MAX_TOKENS,
     )
@@ -85,6 +87,7 @@ def generate(
     source_url: str,
     source_headline: str,
     source_summary: str,
+    model: ModelChoice,
     previous_build_error: str | None = None,
     app_id: str | None = None,
 ) -> GeneratorOutput:
@@ -110,7 +113,7 @@ def generate(
             + "\n\nFix the issue and produce the same JSON structure again."
         )
 
-    text = _call([{"role": "user", "content": user_prompt}], app_id=app_id)
+    text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:
         return GeneratorOutput.model_validate(_extract_json(text))
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
@@ -122,7 +125,7 @@ def generate(
         + text[:1500]
         + "\n\nReturn the JSON object only, no prose, no markdown fences."
     )
-    text2 = _call([{"role": "user", "content": retry_prompt}], app_id=app_id)
+    text2 = _call([{"role": "user", "content": retry_prompt}], model=model, app_id=app_id)
     try:
         return GeneratorOutput.model_validate(_extract_json(text2))
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:

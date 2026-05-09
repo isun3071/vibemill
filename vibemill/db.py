@@ -72,6 +72,11 @@ class App(SQLModel, table=True):
     # attestation alongside an actually-broken app is its own bit).
     verifier_verdict: str | None = None
     verifier_notes: str | None = None
+    # Added by migration 003. Records the generator + README model that
+    # produced this app. Used for fingerprint-pattern analysis. Not displayed
+    # in the artifact (per ANTI_PATTERNS rule 10).
+    generator_model: str | None = None
+    readme_model: str | None = None
 
 
 class Rejection(SQLModel, table=True):
@@ -219,6 +224,10 @@ def insert_app(record: AppRecord) -> None:
         retired_at=(
             record.retired_at.strftime("%Y-%m-%dT%H:%M:%SZ") if record.retired_at else None
         ),
+        verifier_verdict=record.verifier_verdict,
+        verifier_notes=record.verifier_notes,
+        generator_model=record.generator_model,
+        readme_model=record.readme_model,
     )
     with session() as s:
         s.add(row)

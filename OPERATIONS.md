@@ -167,6 +167,66 @@ Stillborn apps appear in the cemetery with status `stillborn` and a special tomb
 
 These are not hidden. They are part of the artifact: even an industrial app machine has a stillbirth rate. Showing it preserves the operation's honesty.
 
+## Generator substrate composition
+
+Per-app, the orchestrator picks one model from the configured generator pool (weighted) for the codegen call. The verifier shares that pick (within-app fingerprint coherence). The README writer matches the generator under default `README_ROTATION_MODE=match_generator` (so the app feels like one human used one tool for code and copy); under `fixed`, README falls back to the legacy `README_MODEL` slug.
+
+**Guard and matcher do not rotate.** They stay on `anthropic/claude-haiku-4.5` so the calibration work in `scripts/calibrate_matcher.py` remains comparable across runs. Guard and matcher are classifiers, not authors; rotation would only add noise.
+
+### Why rotate at all
+
+See ANTI_PATTERNS.md rule 5 v4. The empirical observation: two production runs against live news both shipped Trackers that looked nearly identical — same palette, same card grid, same copy register, same header treatment. Real human vibecoders do converge on shape (the genre's modal point: Tailwind cards + dark mode + emoji headers) but they leave fingerprint-level variance via different tools, palette flavors, copy tics. Single-pipeline LLM output produces zero such variance, which is *less faithful* to the genre's natural distribution than the satire requires. Substrate rotation samples across the variance space the genre's real producers occupy.
+
+### Pool composition
+
+8 generator models, weighted to approximate the substrate mix a real population of cost-conscious vibecoders uses:
+
+```
+GENERATOR_MODELS=deepseek/deepseek-v4-flash,meta-llama/llama-4-maverick,qwen/qwen3.6-flash,google/gemini-3.1-flash-lite,openai/gpt-5.4-nano,minimax/minimax-m2.7,z-ai/glm-5,xiaomi/mimo-v2.5
+GENERATOR_WEIGHTS=0.30,0.20,0.10,0.10,0.10,0.10,0.05,0.05
+```
+
+The composition is deliberate: a Chinese open-weights cohort (DeepSeek, Qwen, MiniMax, GLM, MiMo) representing the substrates non-US vibecoders increasingly default to; an American budget tier (Llama 4 Maverick, GPT-5.4 nano, Gemini 3.1 Flash Lite) representing what cost-conscious US vibecoders reach for when Cursor or Claude Code aren't paid. The weights skew toward DeepSeek + Llama because those are the modal picks empirically.
+
+Weighted-average effective output cost across this pool: ~$0.85/M. Hard cap: `MAX_OUTPUT_PRICE_USD_PER_M=2.00`.
+
+### Reasoning policy
+
+```
+GENERATOR_REASONING_EFFORTS=medium,disabled,disabled,disabled,disabled,disabled,disabled,disabled
+```
+
+Only DeepSeek V4 Flash runs reasoning, at medium effort. The other 7 run reasoning-disabled. Guard, matcher, and README always run reasoning-disabled.
+
+**Per-model reasoning is set in env, not code.** The `vibemill/model_rotation.py` module reads the parallel arrays and refuses to launch a tick if the effort string isn't one of `disabled | low | medium | high`.
+
+**Effective cost calculation** (in `validate_pool_pricing`):
+
+| Effort | Multiplier vs. nominal completion price |
+|---|---|
+| disabled | 1.0x |
+| low | 1.5x |
+| medium | 3.0x |
+| high | 6.0x |
+
+At tick start, `validate_pool_pricing` fetches `https://openrouter.ai/api/v1/models`, looks up each pool member's nominal completion price, multiplies by the configured reasoning multiplier, compares to `MAX_OUTPUT_PRICE_USD_PER_M`. If any model breaches the cap, the tick aborts cleanly with a message. This catches "we added a model whose price went up" without hand-tracking OpenRouter's pricing.
+
+### Rationale
+
+Why this asymmetry rather than blanket-disable or blanket-enable:
+
+- **Genre faithfulness.** A real population of vibecoders does include some who turn reasoning on for the aesthetic of having thought things through, even when the underlying output is still slop. The "considered the trade-offs" prose, justified architecture choices, and more elaborate commits are real fingerprint signatures of reasoning-mode output. Reproducing them faithfully requires actually using reasoning sometimes.
+- **Cost-conscious selection pressure modeling.** Vibecoders who turn reasoning on tend to do so on the cheapest model that supports it, because reasoning multiplies the per-call cost. Of the pool, only DeepSeek V4 Flash is cheap enough that medium-effort reasoning stays under the cap. The other 7 would breach. So in our pool, only DeepSeek runs reasoning — exactly as a real cost-conscious population would distribute.
+- **The asymmetry is itself the fingerprint.** Some apps in the corpus carry the "reasoning-mode" signature; most don't. That distribution is itself faithful.
+
+### Rate limit handling
+
+If a generator call returns a rate-limit error from OpenRouter (429 or provider-side rate limit) after the openrouter client's three internal retries with exponential backoff, the orchestrator re-rolls the model from the pool (excluding the failed slug) and retries the generator call once. If that also fails, the failure flows through the existing build-retry path; if both build attempts ultimately fail, the app is stillborn `never_built` per the existing failure handling. No complex fallback chain.
+
+### Per-app model identity is recorded, not displayed
+
+Both the generator's slug and the README's slug land in the SQLite `apps` table (columns `generator_model`, `readme_model`, added by migration 003) and mirror to Supabase. **The model identity does NOT appear in the generated app's footer.** Per ANTI_PATTERNS rule 10 (do not advertise the satire), the canonical footer copy from `VOICE.md` is unchanged. Recording the model identity for fingerprint-pattern analysis is operational instrumentation; displaying it in the artifact would turn the app into a self-aware demo.
+
 ## Operational metrics to track
 
 Logged to SQLite for internal use:
