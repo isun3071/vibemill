@@ -138,6 +138,21 @@ def assert_committed_path_column() -> None:
     )
 
 
+def assert_readme_persona_column() -> None:
+    """Verify migration 005 (readme_persona text) has been applied to the
+    Supabase apps table."""
+    url = f"{_base()}/rest/v1/apps?select=readme_persona&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 005 (readme_persona) is missing on the Supabase apps "
+        f"table. HTTP {r.status_code}: {r.text[:200]}. Apply "
+        "migrations/supabase/005_add_readme_persona_column.sql manually "
+        "in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

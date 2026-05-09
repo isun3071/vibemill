@@ -173,6 +173,7 @@ class AppRecord(BaseModel):
     generator_model: str | None = None
     readme_model: str | None = None
     committed_path: bool = False
+    readme_persona: str | None = None
 
 
 class RejectionRecord(BaseModel):

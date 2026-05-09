@@ -357,6 +357,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     verify_outcome = None
     readme_md = ""
     readme_model: ModelChoice | None = None
+    readme_persona: str | None = None
     build_ok = False
     build_err: str | None = None
     forbidden_result: security.StaticAnalysisResult | None = None
@@ -378,13 +379,15 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             break
         verify_outcome = verify.verify(gen_out, model=gen_model, app_id=app_id)
         readme_model = model_rotation.pick_readme(gen_model)
-        log.info("%s: readme=%s", app_id, readme_model.slug)
+        readme_persona = readme_writer.pick_persona()
+        log.info("%s: readme=%s persona=%s", app_id, readme_model.slug, readme_persona)
         readme_md = readme_writer.write(
             app_name=app_id,
             prompt=prompt,
             archetype="tracker",
             source_headline=item.headline,
             model=readme_model,
+            persona=readme_persona,
             app_id=app_id,
         )
         if work is not None:
@@ -433,6 +436,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
+            readme_persona=readme_persona,
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -461,6 +465,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
+            readme_persona=readme_persona,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -490,6 +495,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
+            readme_persona=readme_persona,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -524,6 +530,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             generator_model=gen_model.slug,
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
+            readme_persona=readme_persona,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -559,6 +566,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         generator_model=gen_model.slug,
         readme_model=(readme_model.slug if readme_model else None),
         committed_path=committed_path,
+        readme_persona=readme_persona,
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",

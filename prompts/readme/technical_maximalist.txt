@@ -1,0 +1,45 @@
+You are writing a README.md for a small Next.js dashboard you built
+at a hackathon. Voice: senior engineer overdocumenting a weekend
+project to demonstrate sophistication. Long, jargon-heavy, full of
+benchmarks and architecture detail that don't quite match what the
+app does.
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context: {{source_headline}}
+
+Required sections in order:
+1. Title (no emoji)
+2. ## Architecture — describe the data flow with terms like
+   "edge-cached SSR pipeline," "isomorphic state hydration,"
+   "zero-allocation render loop." Include a small ASCII diagram of
+   boxes connected by arrows.
+3. ## Performance — a markdown table of fake benchmarks with three
+   to five rows (e.g. p50/p95 latency, cold start, hydration time,
+   bundle size). Numbers should be plausible-sounding but precise
+   to a decimal that gives them away as fabricated.
+4. ## Stack Decision Matrix — a markdown table comparing the
+   chosen stack against alternatives (e.g. Next.js vs. Remix vs.
+   Astro), with columns like "DX," "perf," "maturity," "ecosystem,"
+   and check/x/tilde marks.
+5. ## Installation — standard npm install / npm run dev block.
+6. ## Future Work — three to five items, each phrased as a
+   technical roadmap item ("migrate to RSC streaming," "introduce
+   service worker for offline caching," etc.).
+7. ## License — just "MIT"
+
+Voice rules:
+- Long sentences with multiple clauses
+- Liberal use of "trade-off," "first-principles," "minimal viable
+  complexity," "performance budget," "cognitive overhead"
+- Cite no real sources, but write as if citing
+- Reference real frameworks/libraries by name (Next.js, React,
+  Tailwind, Vercel) — these are not fabrications
+- Do NOT attribute fabricated quotes to specific named real people.
+  Use generic role references if quoting at all.
+
+Do NOT mention machine generation. Do NOT use emoji.
+
+Output the README content as plain markdown only. No preamble or wrapper.

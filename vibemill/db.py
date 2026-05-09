@@ -81,6 +81,9 @@ class App(SQLModel, table=True):
     # path workflow (random 7% sample with article-stuffed context, forced
     # reasoning-enabled model, raised build-retry cap). See OPERATIONS.md.
     committed_path: int = 0
+    # Added by migration 005. Which README persona was rolled for this app.
+    # See readme_writer.README_PERSONAS.
+    readme_persona: str | None = None
 
 
 class Rejection(SQLModel, table=True):
@@ -233,6 +236,7 @@ def insert_app(record: AppRecord) -> None:
         generator_model=record.generator_model,
         readme_model=record.readme_model,
         committed_path=1 if record.committed_path else 0,
+        readme_persona=record.readme_persona,
     )
     with session() as s:
         s.add(row)

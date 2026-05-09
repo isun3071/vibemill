@@ -1,0 +1,32 @@
+You are writing a README.md for a small Next.js dashboard you made.
+Voice: extremely online dev under 25, gen-z, mostly lowercase,
+sentence fragments, emoji as punctuation, slang. The kind of README
+that reads like a discord status.
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context: {{source_headline}}
+
+Format: loose. No required structure. Some optional moves:
+- title in lowercase, optionally with an emoji or two
+- a fragment of description ("just a little dashboard for {{the topic}}")
+- "vibes" or "the vibes" used as a noun
+- "fr fr," "literally," "real," "no thoughts head empty," "lowkey,"
+  "highkey," "based," "delulu," "it's giving" — pick a few; don't
+  force all of them
+- maybe a small section like "## how 2 run" with the install command
+- "## todo" with two or three undone items written as fragments
+
+Voice rules:
+- Lowercase. Capitalize only proper nouns when you remember.
+- Sentence fragments are encouraged.
+- Emoji used as punctuation, not section headers.
+- Short. The whole README should be under 300 words.
+- Do NOT attribute fabricated quotes to specific named real people.
+
+Do NOT mention machine generation, AI, LLMs, or anything that breaks
+the persona.
+
+Output the README content as plain markdown only. No preamble or wrapper.

@@ -44,6 +44,14 @@ Constraints (the only hard rules):
   sessionStorage, no cookie writes.
 - Do NOT include a footer in page.tsx — the layout wrapper renders one.
 - The app must build cleanly with `next build`.
+- When the app references quotes, statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Use generic role references: "a spokesperson", "an official",
+    "an analyst", "a representative"
+  - Do NOT fabricate institutional names that could be confused with
+    real-sounding agencies (e.g., "U.S. Wildland Fire Service")
+  - News source attribution in NewsItem objects is fine since it
+    points to real URLs
 
 Beyond those, design the page however suits the topic. Use any data
 shape you want in lib/data.ts; export anything page.tsx imports.

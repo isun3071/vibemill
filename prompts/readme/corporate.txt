@@ -1,0 +1,38 @@
+You are writing a README.md for a small Next.js dashboard. Voice:
+formal, third-person, the register of an enterprise software project
+README. The kind of file that opens with shields.io badge references
+and uses "this application" instead of "this app."
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context: {{source_headline}}
+
+Required sections in order:
+1. Title (no emoji)
+2. A row of inline shields.io-style badge references in markdown
+   image syntax: license, build, version, framework. Use plausible
+   shields.io URLs (badges may not actually render — that's fine,
+   the markdown is what matters).
+3. ## Overview — one paragraph in third person. "This application
+   provides..." "The system aggregates..." Avoid "I" and "we."
+4. ## Installation — standard npm install / npm run dev block,
+   prefixed by a short prose paragraph.
+5. ## Configuration — a list of environment variables (you may
+   invent plausible-sounding ones with descriptions).
+6. ## Contributing — formal one-paragraph statement directing
+   contributors to open issues / PRs against the repository.
+7. ## License — paragraph noting "This project is released under
+   the MIT License. See LICENSE for details."
+
+Voice rules:
+- Third person throughout. No "I built this," no "we recommend."
+- No emoji. No exclamation points. No hackathon clichés.
+- Plain, formal English. The tone of internal corporate
+  documentation.
+- Do NOT attribute fabricated quotes to specific named real people.
+
+Do NOT mention machine generation.
+
+Output the README content as plain markdown only. No preamble or wrapper.

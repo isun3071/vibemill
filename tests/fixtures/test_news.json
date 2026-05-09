@@ -1,7 +1,7 @@
 {
-  "url": "https://example.com/news/strait-of-hormuz-tanker-disruption",
-  "headline": "Strait of Hormuz tanker traffic disrupted by escalating tensions",
-  "summary": "Daily tanker transits through the Strait of Hormuz have dropped 35 percent over the last two weeks following maritime incidents and naval posturing. Shipping insurers are quoting elevated war-risk premiums; refineries in five Asian markets are publishing contingency schedules. Freight rates on alternative routes are climbing.",
+  "url": "https://example.com/news/epa-q1-air-quality-dashboard",
+  "headline": "EPA releases Q1 2026 air quality dashboard for 50 US metros",
+  "summary": "Particulate readings rose in 18 of 50 cities tracked. The new dashboard publishes weekly per-city PM2.5 averages and ranks regions by year-over-year change. Coverage extends through Q4 2026.",
   "feed_source": "fixture",
   "published_at": "2026-05-08T12:00:00Z",
   "expected_outcome": "happy_path"

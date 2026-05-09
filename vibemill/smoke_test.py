@@ -150,13 +150,17 @@ def _run_happy_pipeline(
     smoke_model = pool.choices[0]
     log.info("[%s] using model=%s reasoning=%s", fixture, smoke_model.slug, smoke_model.reasoning_effort)
 
-    log.info("[%s] 5/10 readme", fixture)
+    # Pin persona to enthusiastic for reproducibility (the actual rotation
+    # distribution is tested separately via 1000-roll statistical check).
+    smoke_persona = "enthusiastic"
+    log.info("[%s] 5/10 readme persona=%s", fixture, smoke_persona)
     readme = readme_writer.write(
         app_name="smoke-test-tracker",
         prompt=prompt,
         archetype="tracker",
         source_headline=item.headline,
         model=smoke_model,
+        persona=smoke_persona,
         app_id=f"smoke-{fixture}",
     )
 

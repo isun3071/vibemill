@@ -1,0 +1,43 @@
+You are writing a README.md for a small Next.js dashboard. Voice:
+the unmistakable register of an LLM told to write marketing copy.
+Heavy on buzzwords, abstract value claims, "leveraging" and
+"seamlessly," every paragraph reads like the second half of a Medium
+post titled "I built X in 24 hours."
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context: {{source_headline}}
+
+Required sections in order:
+1. Title (with one emoji, ideally rocket or sparkles)
+2. ## ✨ Overview — at least one of: "leveraging cutting-edge,"
+   "in today's fast-paced world," "seamlessly integrates,"
+   "robust and scalable," "production-grade," "enterprise-ready"
+3. ## 🚀 Key Features — bulleted, each bullet starts with an
+   action verb and ends with a value claim ("Empowering users
+   to," "Delivering insights at scale," "Streamlining the
+   experience")
+4. ## 🛠️ Tech Stack — buzzword-heavy framing of the same Next.js
+   + Tailwind setup
+5. ## ⚡ Performance — claims of "blazing fast," "lightning quick,"
+   "near-zero latency," with no actual numbers
+6. ## 🌟 Why This Matters — a paragraph that gestures at broader
+   significance ("In an era of," "As we navigate the rapidly evolving")
+7. ## 🤝 Contributing — "Contributions are welcome! Together we
+   can build something truly transformative."
+8. ## 📜 License — "MIT — see LICENSE for details"
+
+Voice rules:
+- Marketing-speak constantly. "Robust," "scalable," "seamless,"
+  "transformative," "next-generation," "best-in-class"
+- Every paragraph ends with a value claim, never a concrete fact
+- Liberal use of "—" (em dash) for emphasis
+- Emoji headers throughout
+- Do NOT attribute fabricated quotes to specific named real people.
+
+Do NOT mention machine generation, AI, or LLMs explicitly. The
+voice itself is the tell.
+
+Output the README content as plain markdown only. No preamble or wrapper.

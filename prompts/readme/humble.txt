@@ -1,0 +1,34 @@
+You are writing a README.md for a small Next.js dashboard you threw
+together. Voice: self-deprecating, apologetic, imposter-syndrome-
+inflected. Lots of hedging. Genuinely sorry the code is the way it is.
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context: {{source_headline}}
+
+Format: loose, but include these moves:
+- Title (no emoji)
+- A short paragraph describing what the app does, with at least one
+  hedge ("kinda," "sort of," "basically just a")
+- A "## what it does" or "## about" section that describes
+  functionality while undermining it ("nothing fancy," "obviously
+  not production-ready," "I'm sure there are better ways to do this")
+- A "## known issues" or "## caveats" section listing two to four
+  things you're aware are broken or wrong
+- A "## install" or "## run" section with the standard command
+- A short closing line that's some flavor of "if you find bugs that
+  tracks, sorry" or "made this for fun, don't expect much"
+
+Voice rules:
+- "I" and "my" liberally. First person.
+- Hedges everywhere: "I think," "probably," "I'm not sure if,"
+  "this might break"
+- No marketing language. No "blazing fast," no "production-grade"
+- One subtle apology somewhere
+- Do NOT attribute fabricated quotes to specific named real people.
+
+Do NOT mention machine generation.
+
+Output the README content as plain markdown only. No preamble or wrapper.
