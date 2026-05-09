@@ -20,10 +20,16 @@ from .models import NewsItem
 log = logging.getLogger(__name__)
 
 FEEDS: dict[str, str] = {
-    # AP retired their public RSS at some point in 2025. NPR substituted as
-    # the second feed; keeps two-feed diversity and the geographic balance.
+    # AP and Reuters both retired their public RSS feeds (AP sometime in 2025,
+    # Reuters earlier; feeds.reuters.com no longer resolves). NPR substituted
+    # for AP. Reuters is sourced indirectly via a Google News search-by-site
+    # query, which returns Reuters articles via news.google.com redirect URLs;
+    # dedup still works because news_cache keys on URL.
     "npr": "https://feeds.npr.org/1001/rss.xml",
     "bbc": "https://feeds.bbci.co.uk/news/rss.xml",
+    "aljazeera": "https://www.aljazeera.com/xml/rss/all.xml",
+    "wired": "https://www.wired.com/feed/rss",
+    "reuters": "https://news.google.com/rss/search?q=site:reuters.com&hl=en-US&gl=US&ceid=US:en",
 }
 
 _TIMEOUT_S = 30
