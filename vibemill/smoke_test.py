@@ -97,15 +97,18 @@ def _load_fixture(name: str) -> tuple[NewsItem, str]:
     return item, expected
 
 
-def _stage(chassis: Path, *, page_tsx: str, data_ts: str, readme_md: str) -> Path:
+def _stage(chassis: Path, *, page_tsx: str, data_ts: str, styles_css: str, readme_md: str) -> Path:
     work = Path(tempfile.mkdtemp(prefix="vibemill-smoke-"))
     shutil.copytree(chassis, work, dirs_exist_ok=True)
     page_path = work / "app" / "page.tsx"
     data_path = work / "lib" / "data.ts"
+    styles_path = work / "app" / "styles.css"
     page_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.parent.mkdir(parents=True, exist_ok=True)
+    styles_path.parent.mkdir(parents=True, exist_ok=True)
     page_path.write_text(page_tsx)
     data_path.write_text(data_ts)
+    styles_path.write_text(styles_css or "/* (empty) */\n")
     (work / "README.md").write_text(readme_md or "")
     return work
 
@@ -193,7 +196,13 @@ def _run_happy_pipeline(
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
         log.info("[%s] 7/10 stage chassis (attempt %d)", fixture, attempt)
-        work = _stage(chassis, page_tsx=v_out.output.page_tsx, data_ts=v_out.output.data_ts, readme_md=readme)
+        work = _stage(
+            chassis,
+            page_tsx=v_out.output.page_tsx,
+            data_ts=v_out.output.data_ts,
+            styles_css=v_out.output.styles_css,
+            readme_md=readme,
+        )
 
         log.info("[%s] 8/10 npm install + next build (attempt %d)", fixture, attempt)
         started = time.monotonic()

@@ -11,6 +11,7 @@ Respond in JSON only with this structure:
 {
   "page_tsx": "...",
   "data_ts": "...",
+  "styles_css": "...",
   "verdict": "looks good" | "fixed issues" | "found issues but unsure how to fix",
   "notes": "brief description of what you checked or fixed, one to two sentences"
 }

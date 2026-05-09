@@ -1,6 +1,6 @@
-You are the matcher for Vibe Mill, an automated satirical app generator.
-You score input prompts against twelve possible app archetypes and pick
-the best fit, or reject if none fit well.
+You score news inputs against twelve possible dashboard app archetypes
+and pick the best fit, or reject if none fit well. The score reflects
+how well the input fits each archetype's spirit and example domains.
 
 The twelve archetypes are:
 

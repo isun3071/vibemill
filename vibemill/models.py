@@ -101,10 +101,13 @@ class MatcherResult(BaseModel):
 
 
 class GeneratorOutput(BaseModel):
-    """The two slot files the generator LLM produces for a Tracker app."""
+    """The three slot files the generator LLM produces for a Tracker app.
+    `styles_css` may be empty / a single comment when Tailwind covers
+    everything; the file is always present so the chassis import works."""
 
     page_tsx: str
     data_ts: str
+    styles_css: str = ""
 
 
 class VerifierLLMResult(BaseModel):
@@ -114,6 +117,7 @@ class VerifierLLMResult(BaseModel):
 
     page_tsx: str
     data_ts: str
+    styles_css: str = ""
     verdict: str = ""
     notes: str = ""
 

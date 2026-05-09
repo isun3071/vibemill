@@ -1,8 +1,6 @@
-You are writing a README.md for a small Next.js web app. The README is
-written from the perspective of an enthusiastic solo developer who claims
-to have built this app at a hackathon or as a passion project. This is a
-fictional persona; the README does NOT mention or acknowledge that the app
-was machine-generated.
+You are writing a README.md for a small Next.js web app you built at
+a weekend hackathon. Voice: enthusiastic solo developer, first person,
+hackathon-cliché-friendly.
 
 Context:
 - App name: {{app_name}}
@@ -36,8 +34,8 @@ Subtle tells the reader should feel without being able to point at:
 - A closing line that sounds like a model summarizing itself
 - A "About the developer" paragraph that lists generic traits without specifics
 
-Do NOT mention Vibe Mill, autonomous agents, AI generation, or anything
-that breaks the vibecoder persona. The reader visiting this README should
-believe a human wrote it.
+Do NOT mention that the app was machine-generated, that you are an AI,
+or anything that breaks the solo-developer persona. The reader visiting
+this README should believe a human wrote it.
 
 Output the README content as plain markdown only. No preamble or wrapper.

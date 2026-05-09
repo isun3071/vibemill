@@ -58,6 +58,8 @@ def _format_files(generated: GeneratorOutput) -> str:
         + generated.page_tsx
         + "\n--- lib/data.ts ---\n"
         + generated.data_ts
+        + "\n--- app/styles.css ---\n"
+        + (generated.styles_css or "/* (empty) */")
     )
 
 
@@ -131,7 +133,11 @@ def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None
 
     verdict = _normalize_verdict(parsed.verdict)
     if verdict == VERDICT_FIXED:
-        out = GeneratorOutput(page_tsx=parsed.page_tsx, data_ts=parsed.data_ts)
+        out = GeneratorOutput(
+            page_tsx=parsed.page_tsx,
+            data_ts=parsed.data_ts,
+            styles_css=parsed.styles_css or generated.styles_css,
+        )
     else:
         # 'looks good' or 'found issues but unsure how to fix': ship original.
         out = generated

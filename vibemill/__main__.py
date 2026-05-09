@@ -86,6 +86,7 @@ def _stage_chassis(
     *,
     page_tsx: str,
     data_ts: str,
+    styles_css: str,
     readme_md: str,
 ) -> Path:
     """Copy the chassis into a tempdir, write the slot files, return the path."""
@@ -93,10 +94,13 @@ def _stage_chassis(
     shutil.copytree(src_chassis, work, dirs_exist_ok=True)
     page_path = work / "app" / "page.tsx"
     data_path = work / "lib" / "data.ts"
+    styles_path = work / "app" / "styles.css"
     page_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.parent.mkdir(parents=True, exist_ok=True)
+    styles_path.parent.mkdir(parents=True, exist_ok=True)
     page_path.write_text(page_tsx)
     data_path.write_text(data_ts)
+    styles_path.write_text(styles_css or "/* (empty) */\n")
     (work / "README.md").write_text(readme_md or "")
     return work
 
@@ -330,6 +334,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             chassis_dir,
             page_tsx=verify_outcome.output.page_tsx,
             data_ts=verify_outcome.output.data_ts,
+            styles_css=verify_outcome.output.styles_css,
             readme_md=readme_md,
         )
 
