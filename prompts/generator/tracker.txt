@@ -20,10 +20,10 @@ Produce in JSON only, with two keys:
 
 Constraints for app/page.tsx:
 - Use the App Router (this is a Server Component by default; do not add "use client" unless a child component requires it)
-- Import primitives from @/lib/components: Counter, MapPanel, Timeline, NewsList
+- Import the primitives you need from @/lib/components: Counter, MapPanel, Timeline, NewsList. Use whichever subset fits the topic; you do not have to use all four.
 - Import data from @/lib/data
-- Render: a header section with title and tagline, a main grid containing Counter cards, a MapPanel section, a Timeline section, and a NewsList section
-- Use Tailwind utility classes only; no custom CSS
+- Lay out the page however suits THIS specific story. Real vibecoded dashboards vary widely. Some are vertical stacks of full-width sections; some put stat cards on the left and a map or list on the right; some lead with a colored hero header and pack everything below into a dense grid; some open with a single oversized counter as the focal point. Pick a layout that reads well for the topic, not a generic template.
+- Use Tailwind utility classes only; no custom CSS. The color palette is yours: neutral grays work, but a tinted accent (blue, amber, red, slate, emerald, indigo, rose) often matches the tone of the topic. Colored headers, banner sections, alternating section backgrounds, two-column splits, and oversized hero numbers are all reasonable choices.
 - Do NOT include a footer disclaimer in page.tsx; the chassis layout renders the disclaimer
 
 Constraints for lib/data.ts:
@@ -37,7 +37,8 @@ Constraints for lib/data.ts:
 - Include between 3 and 6 counters, 5 to 12 regions, 4 to 10 timeline events, 3 to 6 news items
 
 Style:
-- Visually polished surface (good spacing hierarchy and color contrast)
+- Visually polished surface — good spacing hierarchy, readable contrast, intentional choices
+- Lean into a tonal point of view. A health outbreak tracker should feel different from an election results board which should feel different from a shipping disruption monitor. Title casing, copy register, color choice, and section ordering all carry that point of view.
 - The app should build cleanly with `next build` against the chassis
 - Functional logic: dashboards display the data; clicking elements does not need to do anything interesting but must not crash
 
