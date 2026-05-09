@@ -1,0 +1,12 @@
+{
+  "archetype": "tracker",
+  "chassis_dir": "chassis",
+  "generator_slots": [
+    {"path": "app/page.tsx", "key": "page_tsx"},
+    {"path": "lib/data.ts", "key": "data_ts"}
+  ],
+  "readme_slot": {"path": "README.md", "key": "readme_md"},
+  "expected_data_exports": [
+    "title", "tagline", "counters", "regions", "timelineEvents", "newsItems"
+  ]
+}
