@@ -275,8 +275,9 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     # through to the README.
     gen_model = model_rotation.pick_generator(pool)
     log.info(
-        "shipping %s (archetype=tracker, score=%d, generator=%s reasoning=%s)",
+        "==> SHIPPING %s | archetype=tracker score=%d | generator=%s reasoning=%s | headline=%r",
         app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+        item.headline[:120],
     )
     started = datetime.now(timezone.utc)
 

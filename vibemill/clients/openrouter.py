@@ -168,6 +168,10 @@ def complete(
     tokens_out = int(usage.get("completion_tokens", 0) or 0)
     cost_usd = float(usage.get("cost", 0.0) or 0.0)
 
+    log.info(
+        "openrouter %s model=%s reasoning=%s cost=$%.4f tokens=%d/%d latency=%dms",
+        purpose, model, reasoning_effort, cost_usd, tokens_in, tokens_out, elapsed_ms,
+    )
     _record(
         model=model,
         purpose=purpose,

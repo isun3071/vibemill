@@ -109,6 +109,10 @@ def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None
     """
     user_prompt = _load_prompt().replace("{{generated_files}}", _format_files(generated))
 
+    log.info(
+        "==> VERIFIER PROMPT (model=%s reasoning=%s, %d chars including generator output):\n%s\n<== END VERIFIER PROMPT",
+        model.slug, model.reasoning_effort, len(user_prompt), user_prompt,
+    )
     text = _call(user_prompt, model=model, app_id=app_id)
     try:
         parsed = VerifierLLMResult.model_validate(_extract_json(text))

@@ -113,6 +113,10 @@ def generate(
             + "\n\nFix the issue and produce the same JSON structure again."
         )
 
+    log.info(
+        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
+        model.slug, model.reasoning_effort, archetype, len(user_prompt), user_prompt,
+    )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:
         return GeneratorOutput.model_validate(_extract_json(text))
