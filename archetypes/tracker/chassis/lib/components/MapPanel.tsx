@@ -1,17 +1,24 @@
+// status is typed as string (not a literal union) so the LLM-generated
+// data.ts doesn't have to add `as const`. Unknown values get the gray
+// fallback at render time.
 type Region = {
   name: string;
-  status: "active" | "monitoring" | "resolved" | "unknown";
+  status: string;
   value?: number;
 };
 
-type Props = { regions: Region[] };
+type Props = { regions: readonly Region[] };
 
-const STATUS_STYLES: Record<Region["status"], string> = {
+const STATUS_STYLES: Record<string, string> = {
   active: "bg-red-100 text-red-700",
   monitoring: "bg-amber-100 text-amber-700",
   resolved: "bg-emerald-100 text-emerald-700",
   unknown: "bg-gray-100 text-gray-700",
 };
+
+function statusStyle(s: string): string {
+  return STATUS_STYLES[s] ?? "bg-gray-100 text-gray-700";
+}
 
 export function MapPanel({ regions }: Props) {
   return (
@@ -30,7 +37,7 @@ export function MapPanel({ regions }: Props) {
                 </span>
               ) : null}
               <span
-                className={`text-xs uppercase tracking-wide px-2 py-1 rounded ${STATUS_STYLES[r.status]}`}
+                className={`text-xs uppercase tracking-wide px-2 py-1 rounded ${statusStyle(r.status)}`}
               >
                 {r.status}
               </span>

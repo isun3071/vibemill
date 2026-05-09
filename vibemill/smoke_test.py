@@ -112,21 +112,7 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
             f"scores={m.scores.as_dict()}"
         )
 
-    log.info("smoke: 3/9 generator")
-    gen = generator.generate(
-        archetype="tracker",
-        prompt=prompt,
-        source_url=item.url,
-        source_headline=item.headline,
-        source_summary=item.summary,
-        app_id="smoke",
-    )
-
-    log.info("smoke: 4/9 verifier")
-    v = verify.verify(gen, app_id="smoke")
-    log.info("smoke: verifier verdict=%r", v.verdict)
-
-    log.info("smoke: 5/9 readme")
+    log.info("smoke: 5/9 readme (single LLM call, independent of slot files)")
     readme = readme_writer.write(
         app_name="smoke-test-tracker",
         prompt=prompt,
@@ -136,18 +122,51 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
     )
 
     chassis = settings.archetypes_dir / "tracker" / "chassis"
-    log.info("smoke: 6/9 stage chassis -> tempdir")
-    work = _stage(chassis, page_tsx=v.output.page_tsx, data_ts=v.output.data_ts, readme_md=readme)
+    work: Path | None = None
+    build_seconds = 0
+    v_out = None
+    build_err: str | None = None
 
-    log.info("smoke: 7/9 npm install + next build (workdir=%s)", work)
-    started = time.monotonic()
-    ok, output = _build(work)
-    build_seconds = int(time.monotonic() - started)
-    if not ok:
-        if not keep_workdir:
+    # generator -> verifier -> stage -> build, with one retry on build failure.
+    # Mirrors __main__._ship_one() so the smoke test exercises the same
+    # resilience the production pipeline has.
+    for attempt in (1, 2):
+        log.info("smoke: 3/9 generator (attempt %d)", attempt)
+        gen = generator.generate(
+            archetype="tracker",
+            prompt=prompt,
+            source_url=item.url,
+            source_headline=item.headline,
+            source_summary=item.summary,
+            previous_build_error=build_err,
+            app_id="smoke",
+        )
+
+        log.info("smoke: 4/9 verifier (attempt %d)", attempt)
+        v_out = verify.verify(gen, app_id="smoke")
+        log.info("smoke: verifier verdict=%r", v_out.verdict)
+
+        if work is not None:
             shutil.rmtree(work, ignore_errors=True)
-        raise SmokeFailure(f"build failed after {build_seconds}s:\n{output}")
-    log.info("smoke: 8/9 build ok in %ds", build_seconds)
+        log.info("smoke: 6/9 stage chassis -> tempdir (attempt %d)", attempt)
+        work = _stage(chassis, page_tsx=v_out.output.page_tsx, data_ts=v_out.output.data_ts, readme_md=readme)
+
+        log.info("smoke: 7/9 npm install + next build (attempt %d, workdir=%s)", attempt, work)
+        started = time.monotonic()
+        ok, output = _build(work)
+        build_seconds = int(time.monotonic() - started)
+        if ok:
+            log.info("smoke: 8/9 build ok in %ds (attempt %d)", build_seconds, attempt)
+            break
+        log.warning("smoke: build failed on attempt %d in %ds:\n%s", attempt, build_seconds, output[:600])
+        build_err = output
+    else:
+        if not keep_workdir and work is not None:
+            shutil.rmtree(work, ignore_errors=True)
+        raise SmokeFailure(f"build failed after {build_seconds}s on retry:\n{build_err}")
+
+    assert v_out is not None and work is not None  # mypy: loop ran at least once
+    v = v_out
 
     if not keep_workdir:
         shutil.rmtree(work, ignore_errors=True)
