@@ -70,25 +70,45 @@ def retire_cmd(app_id: str) -> None:
 
 
 @cli.command("smoke-test")
+@click.option("--fixture", default=None, help="Single fixture filename under tests/fixtures/ (default: run all)")
 @click.option("--keep", is_flag=True, help="leave the temp build dir on disk")
-def smoke_cmd(keep: bool) -> None:
-    """Run the end-to-end smoke test (LLM pipeline + next build, no GitHub/Vercel)."""
+def smoke_cmd(fixture: str | None, keep: bool) -> None:
+    """Run smoke fixtures end-to-end (LLM pipeline + next build, no GitHub/Vercel).
+
+    Default runs all four fixtures: happy_path, guard_reject, matcher_reject,
+    non_tracker_archetype. --fixture NAME runs just one.
+    """
     from . import smoke_test
-    try:
-        result = smoke_test.run(keep_workdir=keep)
-    except Exception as exc:
-        console.print(f"[red]smoke test FAILED: {exc}[/red]")
+    fixtures = [fixture] if fixture else list(smoke_test.DEFAULT_FIXTURES)
+    failures = 0
+    for name in fixtures:
+        try:
+            result = smoke_test.run_one(name, keep_workdir=keep)
+        except smoke_test.SmokeFailure as exc:
+            console.print(f"[red][FAIL] {name}: {exc}[/red]")
+            failures += 1
+            continue
+        color = "green" if result.outcome_matched else "red"
+        tag = "PASS" if result.outcome_matched else "FAIL"
+        console.print(f"[{color}][{tag}] {name}[/{color}]  expected={result.expected_outcome} got={result.outcome}")
+        console.print(f"    guard: {result.guard_decision}  matcher: {result.matcher_selected or '-'}")
+        if result.outcome == smoke_test.OUTCOME_HAPPY:
+            console.print(
+                f"    verifier: {result.verifier_verdict}  "
+                f"static: {'ok' if result.static_analysis_safe else 'FAIL'}  "
+                f"build: {'ok' if result.build_ok else 'FAIL'} in {result.build_seconds}s"
+            )
+        if result.notes:
+            console.print(f"    notes: {result.notes}")
+        console.print(f"    cost: ${result.cost_usd:.4f}")
+        if keep and result.workdir:
+            console.print(f"    workdir: {result.workdir}")
+        if not result.outcome_matched:
+            failures += 1
+    if len(fixtures) > 1:
+        console.print(f"\n{len(fixtures) - failures}/{len(fixtures)} fixtures passed")
+    if failures:
         sys.exit(1)
-    console.print(f"[green]smoke test PASSED[/green]")
-    console.print(f"  guard: {result.guard_decision}")
-    console.print(f"  matcher selected: {result.matcher_selected}")
-    console.print(f"  generator: {result.generator_chars} chars across two slots")
-    console.print(f"  verifier verdict: {result.verifier_verdict}")
-    console.print(f"  static analysis: {'OK' if result.static_analysis_safe else 'FAILED'}")
-    console.print(f"  build: {'OK' if result.build_ok else 'FAILED'} in {result.build_seconds}s")
-    if keep:
-        console.print(f"  workdir: {result.workdir}")
-    console.print(f"  total cost: ${result.cost_usd:.4f}")
 
 
 @cli.command("audit")

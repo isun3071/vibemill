@@ -1,22 +1,31 @@
 """End-to-end smoke test for the LLM pipeline + chassis build.
 
-Steps (per GENERATOR.md v2):
-1. Load fixed test news fixture
-2. Guard (must pass)
-3. Matcher (must select Tracker)
-4. Generator
-5. Verifier
-6. JSON validity covered by pydantic parsing
-7. Stage chassis + write slot files in a tempdir
-8. Run npm install + next build
-9. Assert build succeeds
+Fixture-driven: each fixture in tests/fixtures/test_news*.json carries
+its own `expected_outcome`, and the test asserts that branch was taken
+without raising on the rejection paths.
+
+Outcomes the smoke test recognises:
+- happy_path: guard pass, tracker selected, build_ok=True
+- guard_reject: guard returns reject (short-circuits; no matcher call)
+- matcher_reject: guard pass, matcher returns selected_archetypes=[]
+- non_tracker_archetype: guard pass, matcher selects something other
+  than tracker (V0 only ships Tracker; orchestrator would log the
+  rejection with reason 'archetype not yet implemented')
+
+Per ANTI_PATTERNS rule 8 the guard and matcher are separate calls.
+Per GENERATOR.md v3 the static analysis is a hard gate between verify
+and build, no retry; the build step gets one retry on failure.
 
 Does NOT push to GitHub, deploy to Vercel, or take a screenshot.
-Run via: python -m vibemill.smoke_test  OR  vibemill smoke-test
+Run via:
+  python -m vibemill.smoke_test                 # all four fixtures
+  python -m vibemill.smoke_test --fixture NAME  # one fixture
+  vibemill smoke-test [--fixture NAME]
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import shutil
@@ -24,7 +33,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import db, generator, guard, matcher, readme_writer, security, verify
@@ -34,8 +43,22 @@ from .models import NewsItem
 log = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "test_news.json"
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures"
 NEXT_BUILD_TIMEOUT_S = 240
+COST_SANITY_CAP_USD = 0.10
+
+# All bundled smoke fixtures, in the order the CLI runs them.
+DEFAULT_FIXTURES: tuple[str, ...] = (
+    "test_news.json",
+    "test_news_guard_reject.json",
+    "test_news_matcher_reject.json",
+    "test_news_non_tracker.json",
+)
+
+OUTCOME_HAPPY = "happy_path"
+OUTCOME_GUARD_REJECT = "guard_reject"
+OUTCOME_MATCHER_REJECT = "matcher_reject"
+OUTCOME_NON_TRACKER = "non_tracker_archetype"
 
 
 class SmokeFailure(RuntimeError):
@@ -44,26 +67,34 @@ class SmokeFailure(RuntimeError):
 
 @dataclass
 class SmokeResult:
-    guard_decision: str
-    matcher_selected: list[str]
-    generator_chars: int
-    verifier_verdict: str
-    static_analysis_safe: bool
-    build_ok: bool
-    build_seconds: int
-    workdir: Path
-    cost_usd: float
+    fixture: str
+    expected_outcome: str
+    outcome: str = ""
+    outcome_matched: bool = False
+    guard_decision: str = ""
+    matcher_selected: list[str] = field(default_factory=list)
+    generator_chars: int = 0
+    verifier_verdict: str = ""
+    static_analysis_safe: bool | None = None
+    build_ok: bool | None = None
+    build_seconds: int = 0
+    workdir: Path | None = None
+    cost_usd: float = 0.0
+    notes: str = ""
 
 
-def _load_fixture() -> NewsItem:
-    data = json.loads(FIXTURE_PATH.read_text())
-    return NewsItem(
+def _load_fixture(name: str) -> tuple[NewsItem, str]:
+    path = FIXTURE_DIR / name
+    data = json.loads(path.read_text())
+    item = NewsItem(
         url=data["url"],
         headline=data["headline"],
         summary=data["summary"],
-        feed_source=data["feed_source"],
+        feed_source=data.get("feed_source", "fixture"),
         published_at=None,
     )
+    expected = data.get("expected_outcome", OUTCOME_HAPPY)
+    return item, expected
 
 
 def _stage(chassis: Path, *, page_tsx: str, data_ts: str, readme_md: str) -> Path:
@@ -91,48 +122,36 @@ def _build(work: Path) -> tuple[bool, str]:
     return True, build.stdout[-300:]
 
 
-def run(*, keep_workdir: bool = False) -> SmokeResult:
+def _run_happy_pipeline(
+    item: NewsItem,
+    *,
+    keep_workdir: bool,
+    result: SmokeResult,
+) -> None:
+    """Generator -> verifier -> static analysis -> stage -> build, with one
+    retry on build failure. Mutates `result` in place. Raises SmokeFailure on
+    static-analysis stillborn or build retry exhaustion."""
     settings = get_settings()
-    cost_before = db.today_cost_usd()
-    item = _load_fixture()
+    chassis = settings.archetypes_dir / "tracker" / "chassis"
     prompt = f"{item.headline}. {item.summary}".strip()
+    fixture = result.fixture
 
-    log.info("smoke: 1/10 guard")
-    g = guard.check(prompt, app_id="smoke")
-    if g.decision != "pass":
-        raise SmokeFailure(f"guard rejected fixture: {g.reason}")
-
-    log.info("smoke: 2/10 matcher")
-    m = matcher.score(prompt, app_id="smoke")
-    if m is None:
-        raise SmokeFailure("matcher returned None (parse failures)")
-    log.info("smoke: matcher scores=%s selected=%s", m.scores.as_dict(), m.selected_archetypes)
-    if "tracker" not in m.selected_archetypes:
-        raise SmokeFailure(
-            f"fixture did not select tracker; selected={m.selected_archetypes!r} "
-            f"scores={m.scores.as_dict()}"
-        )
-
-    log.info("smoke: 5/10 readme (single LLM call, independent of slot files)")
+    log.info("[%s] 5/10 readme", fixture)
     readme = readme_writer.write(
         app_name="smoke-test-tracker",
         prompt=prompt,
         archetype="tracker",
         source_headline=item.headline,
-        app_id="smoke",
+        app_id=f"smoke-{fixture}",
     )
 
-    chassis = settings.archetypes_dir / "tracker" / "chassis"
     work: Path | None = None
     build_seconds = 0
     v_out = None
     build_err: str | None = None
 
-    # generator -> verifier -> static analysis -> stage -> build, with one
-    # retry on build failure. Static analysis is a hard gate: if it fails
-    # the smoke test fails (no retry, per GENERATOR.md v3 failure mode 3).
     for attempt in (1, 2):
-        log.info("smoke: 3/10 generator (attempt %d)", attempt)
+        log.info("[%s] 3/10 generator (attempt %d)", fixture, attempt)
         gen = generator.generate(
             archetype="tracker",
             prompt=prompt,
@@ -140,18 +159,19 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=build_err,
-            app_id="smoke",
+            app_id=f"smoke-{fixture}",
         )
 
-        log.info("smoke: 4/10 verifier (attempt %d)", attempt)
-        v_out = verify.verify(gen, app_id="smoke")
-        log.info("smoke: verifier verdict=%r", v_out.verdict)
+        log.info("[%s] 4/10 verifier (attempt %d)", fixture, attempt)
+        v_out = verify.verify(gen, app_id=f"smoke-{fixture}")
+        log.info("[%s] verifier verdict=%r", fixture, v_out.verdict)
 
-        log.info("smoke: 6/10 static analysis (attempt %d)", attempt)
+        log.info("[%s] 6/10 static analysis (attempt %d)", fixture, attempt)
         sa = security.static_analysis(
             {"app/page.tsx": v_out.output.page_tsx, "lib/data.ts": v_out.output.data_ts},
             archetype="tracker",
         )
+        result.static_analysis_safe = sa.safe
         if not sa.safe:
             if work is not None and not keep_workdir:
                 shutil.rmtree(work, ignore_errors=True)
@@ -159,64 +179,161 @@ def run(*, keep_workdir: bool = False) -> SmokeResult:
 
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
-        log.info("smoke: 7/10 stage chassis -> tempdir (attempt %d)", attempt)
+        log.info("[%s] 7/10 stage chassis (attempt %d)", fixture, attempt)
         work = _stage(chassis, page_tsx=v_out.output.page_tsx, data_ts=v_out.output.data_ts, readme_md=readme)
 
-        log.info("smoke: 8/10 npm install + next build (attempt %d, workdir=%s)", attempt, work)
+        log.info("[%s] 8/10 npm install + next build (attempt %d)", fixture, attempt)
         started = time.monotonic()
         ok, output = _build(work)
         build_seconds = int(time.monotonic() - started)
         if ok:
-            log.info("smoke: 9/10 build ok in %ds (attempt %d)", build_seconds, attempt)
+            log.info("[%s] 9/10 build ok in %ds (attempt %d)", fixture, build_seconds, attempt)
             break
-        log.warning("smoke: build failed on attempt %d in %ds:\n%s", attempt, build_seconds, output[:600])
+        log.warning("[%s] build failed on attempt %d in %ds:\n%s", fixture, attempt, build_seconds, output[:600])
         build_err = output
     else:
         if not keep_workdir and work is not None:
             shutil.rmtree(work, ignore_errors=True)
         raise SmokeFailure(f"build failed after {build_seconds}s on retry:\n{build_err}")
 
-    assert v_out is not None and work is not None  # mypy: loop ran at least once
-    v = v_out
-
+    assert v_out is not None and work is not None
     if not keep_workdir:
         shutil.rmtree(work, ignore_errors=True)
 
-    cost_after = db.today_cost_usd()
-    log.info("smoke: 10/10 done; total cost=$%.4f", cost_after - cost_before)
+    result.verifier_verdict = v_out.verdict
+    result.generator_chars = len(v_out.output.page_tsx) + len(v_out.output.data_ts)
+    result.build_ok = True
+    result.build_seconds = build_seconds
+    result.workdir = work
 
-    return SmokeResult(
-        guard_decision=g.decision,
-        matcher_selected=m.selected_archetypes,
-        generator_chars=len(v.output.page_tsx) + len(v.output.data_ts),
-        verifier_verdict=v.verdict,
-        static_analysis_safe=True,
-        build_ok=True,
-        build_seconds=build_seconds,
-        workdir=work,
-        cost_usd=cost_after - cost_before,
-    )
+
+def run_one(fixture_name: str, *, keep_workdir: bool = False) -> SmokeResult:
+    """Run one fixture through the pipeline, classify the outcome, return the
+    result. Raises SmokeFailure only on infrastructure failures (build retry
+    exhausted, static analysis stillborn on a happy_path fixture, etc.).
+    Outcome mismatches set outcome_matched=False but do not raise.
+    """
+    item, expected = _load_fixture(fixture_name)
+    cost_before = db.today_cost_usd()
+    result = SmokeResult(fixture=fixture_name, expected_outcome=expected)
+    prompt = f"{item.headline}. {item.summary}".strip()
+
+    log.info("[%s] 1/10 guard (expected=%s)", fixture_name, expected)
+    g = guard.check(prompt, app_id=f"smoke-{fixture_name}")
+    result.guard_decision = g.decision
+
+    if g.decision == "reject":
+        result.outcome = OUTCOME_GUARD_REJECT
+        result.outcome_matched = (expected == OUTCOME_GUARD_REJECT)
+        result.notes = f"guard reason: {g.reason}"
+        result.cost_usd = db.today_cost_usd() - cost_before
+        return result
+
+    log.info("[%s] 2/10 matcher", fixture_name)
+    m = matcher.score(prompt, app_id=f"smoke-{fixture_name}")
+    if m is None:
+        # Treat parse failure as matcher_reject since the orchestrator does
+        # the equivalent (logs a rejection with reason 'matcher_error').
+        result.outcome = OUTCOME_MATCHER_REJECT
+        result.outcome_matched = (expected == OUTCOME_MATCHER_REJECT)
+        result.notes = "matcher parse failure"
+        result.cost_usd = db.today_cost_usd() - cost_before
+        return result
+
+    result.matcher_selected = m.selected_archetypes
+    log.info("[%s] matcher selected=%s", fixture_name, m.selected_archetypes)
+
+    if not m.selected_archetypes:
+        result.outcome = OUTCOME_MATCHER_REJECT
+        result.outcome_matched = (expected == OUTCOME_MATCHER_REJECT)
+        best = m.scores.best()
+        result.notes = f"no archetype above threshold; best={best[0]}/{best[1]}"
+        result.cost_usd = db.today_cost_usd() - cost_before
+        return result
+
+    if "tracker" not in m.selected_archetypes:
+        # Matcher picked something but not tracker; in V0 the orchestrator
+        # would log this as 'archetype not yet implemented' and reject.
+        result.outcome = OUTCOME_NON_TRACKER
+        result.outcome_matched = (expected == OUTCOME_NON_TRACKER)
+        result.notes = f"selected={m.selected_archetypes}"
+        result.cost_usd = db.today_cost_usd() - cost_before
+        return result
+
+    # Happy path: tracker is in selected. Run the full build pipeline.
+    if expected != OUTCOME_HAPPY:
+        log.warning(
+            "[%s] expected=%s but matcher selected tracker; running happy pipeline anyway",
+            fixture_name, expected,
+        )
+    _run_happy_pipeline(item, keep_workdir=keep_workdir, result=result)
+    result.outcome = OUTCOME_HAPPY
+    result.outcome_matched = (expected == OUTCOME_HAPPY)
+
+    cost = db.today_cost_usd() - cost_before
+    result.cost_usd = cost
+    if cost >= COST_SANITY_CAP_USD:
+        log.warning("[%s] cost $%.4f exceeded sanity cap $%.4f", fixture_name, cost, COST_SANITY_CAP_USD)
+    log.info("[%s] 10/10 done; cost=$%.4f outcome=%s matched=%s",
+             fixture_name, cost, result.outcome, result.outcome_matched)
+    return result
+
+
+def run_all(*, keep_workdir: bool = False) -> list[SmokeResult]:
+    return [run_one(name, keep_workdir=keep_workdir) for name in DEFAULT_FIXTURES]
+
+
+# Backward-compat shim for the old single-fixture API.
+def run(fixture: str = "test_news.json", *, keep_workdir: bool = False) -> SmokeResult:
+    return run_one(fixture, keep_workdir=keep_workdir)
+
+
+def _print_result(r: SmokeResult) -> None:
+    status = "PASS" if r.outcome_matched else "FAIL"
+    print(f"[{status}] {r.fixture}")
+    print(f"    expected: {r.expected_outcome}    got: {r.outcome}")
+    print(f"    guard: {r.guard_decision}    matcher: {r.matcher_selected or '-'}")
+    if r.outcome == OUTCOME_HAPPY:
+        print(f"    verifier: {r.verifier_verdict}    static: {'ok' if r.static_analysis_safe else 'FAIL'}    build: {'ok' if r.build_ok else 'FAIL'} in {r.build_seconds}s")
+    if r.notes:
+        print(f"    notes: {r.notes}")
+    print(f"    cost: ${r.cost_usd:.4f}")
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Smoke test the LLM pipeline + chassis build")
+    parser.add_argument("--fixture", help="Fixture filename under tests/fixtures/ (default: run all)")
+    parser.add_argument("--keep", action="store_true", help="Leave the temp build dir on disk")
+    args = parser.parse_args()
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         stream=sys.stdout,
     )
-    try:
-        result = run()
-    except SmokeFailure as exc:
-        print(f"SMOKE TEST FAILED: {exc}", file=sys.stderr)
-        return 1
-    print("SMOKE TEST PASSED")
-    print(f"  guard: {result.guard_decision}")
-    print(f"  matcher selected: {result.matcher_selected}")
-    print(f"  verifier verdict: {result.verifier_verdict}")
-    print(f"  generator output: {result.generator_chars} chars")
-    print(f"  build: ok in {result.build_seconds}s")
-    print(f"  total cost: ${result.cost_usd:.4f}")
-    return 0
+
+    if args.fixture:
+        try:
+            result = run_one(args.fixture, keep_workdir=args.keep)
+        except SmokeFailure as exc:
+            print(f"SMOKE TEST FAILED [{args.fixture}]: {exc}", file=sys.stderr)
+            return 1
+        _print_result(result)
+        return 0 if result.outcome_matched else 1
+
+    failures = 0
+    for name in DEFAULT_FIXTURES:
+        try:
+            r = run_one(name, keep_workdir=args.keep)
+        except SmokeFailure as exc:
+            print(f"SMOKE TEST FAILED [{name}]: {exc}", file=sys.stderr)
+            failures += 1
+            continue
+        _print_result(r)
+        if not r.outcome_matched:
+            failures += 1
+    print(f"\n{len(DEFAULT_FIXTURES) - failures}/{len(DEFAULT_FIXTURES)} fixtures passed")
+    return 0 if failures == 0 else 1
 
 
 if __name__ == "__main__":

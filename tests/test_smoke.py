@@ -1,17 +1,13 @@
 """Pytest wrapper around vibemill.smoke_test.
 
-This calls into the runnable smoke module so `pytest` and
-`python -m vibemill.smoke_test` exercise the same code path.
-
-The test hits real OpenRouter (cost: ~$0.01-0.05) and runs npm install +
-next build (~30-60s). It is excluded from normal pytest runs unless
-explicitly selected:
+Parametrized: each bundled fixture is its own test case so a failure
+points at the specific rejection path that broke. All four hit real
+OpenRouter (~$0.04 total) and one fixture runs npm install + next build
+(~30-60s). Excluded from default pytest runs unless explicitly selected:
 
     pytest tests/test_smoke.py -m smoke
 
-Configure pytest to recognize the marker by adding to pyproject.toml:
-    [tool.pytest.ini_options]
-    markers = ["smoke: end-to-end LLM + build test (slow, costs money)"]
+The marker is registered in pyproject.toml.
 """
 
 from __future__ import annotations
@@ -22,9 +18,18 @@ from vibemill import smoke_test
 
 
 @pytest.mark.smoke
-def test_end_to_end() -> None:
-    result = smoke_test.run()
-    assert result.guard_decision == "pass"
-    assert "tracker" in result.matcher_selected
-    assert result.generator_chars > 0
-    assert result.build_ok
+@pytest.mark.parametrize("fixture", list(smoke_test.DEFAULT_FIXTURES))
+def test_fixture(fixture: str) -> None:
+    result = smoke_test.run_one(fixture)
+    assert result.outcome_matched, (
+        f"{fixture}: expected={result.expected_outcome} got={result.outcome} "
+        f"(notes: {result.notes})"
+    )
+    assert result.cost_usd < smoke_test.COST_SANITY_CAP_USD, (
+        f"{fixture}: cost ${result.cost_usd:.4f} exceeded sanity cap "
+        f"${smoke_test.COST_SANITY_CAP_USD:.2f}"
+    )
+    if result.outcome == smoke_test.OUTCOME_HAPPY:
+        assert result.matcher_selected, "happy_path: matcher_selected must be non-empty"
+        assert result.build_ok is True
+        assert result.static_analysis_safe is True
