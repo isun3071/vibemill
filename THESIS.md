@@ -135,6 +135,23 @@ Vibe Mill is bounded. It does not produce frameworks like the Deception Disrupti
 
 Pillar 3 destroys atomicity but does not establish that machines conceive on the scale humans do. It establishes that *some* conception is mechanizable, and the work of figuring out *which* is now an empirical question rather than a metaphysical one. The constructive frameworks of Operation Clarissa ask the post-atomicity questions: given that some human-layer work is decomposable and mechanizable, how should we think about training, hiring, professional identity, and institutional design? Vibe Mill clears the ground. Operation Clarissa builds on it.
 
+## Corollary to Pillar 3: The Popular-Expression Decomposition
+
+A common defense of vibecoded portfolios runs: "Sure, AI generates uniform output, but human creativity produces varied work. Humans have UI/UX instinct, soul, individual shine. Vibe Mill's monotonous output proves the limit of automation."
+
+This defense conflates two distinct things. There is human creativity in general — the unprecedented gesture, the novel form, the irreducible aesthetic invention. And there is the popular expression of creativity within established genres — the Tracker dashboard, the SaaS landing page, the portfolio website, the hackathon submission. Vibe Mill's claim is narrow and specific: the popular expression is automatable.
+
+Visible variance in genre-conforming creative output decomposes into:
+- Template breadth (number of internalized references)
+- Sampling temperature (how widely the producer departs from the most-likely choice)  
+- Freestyle license (willingness to break templates entirely)
+
+All three are knobs on an LLM. Vibe Mill samples a distribution across them and produces a varied cemetery. Each app's substrate identity is recorded in the project's archive (not displayed in the artifact, per the principle that the satire concludes itself). The variance the casual viewer credits to "soul" is named in the archive even as the artifacts themselves stay quiet about it.
+
+This is not a claim that creativity is obsolete or that humans contribute nothing. It is a claim that the credentialing pipeline rewards exactly the version of creativity that's automatable — the popular-expression version, the genre-conforming version, the version evaluators can score. Whatever irreducible creative labor humans contribute is real, but it's not what credentialing infrastructure currently captures or rewards. The pipeline's reward function and the LLM's output distribution overlap heavily, and that overlap is the artifact this project demonstrates.
+
+Pillar 3 said: conception is composite, some sub-processes are mechanizable. This corollary says: creative variance is composite, some sub-processes are mechanizable. The mechanizable parts are larger than rhetorical defenses of "soul" and "shine" admit, but they are not all of creativity. They are specifically the parts the credentialing pipeline rewards.
+
 ---
 
 ## Pillar 4: Cheaply
