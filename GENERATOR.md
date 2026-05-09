@@ -1,5 +1,7 @@
 # Generator
 
+> **Changelog v4:** The chassis is now thinner and the generator has wider creative freedom within each archetype. The chassis provides only layout (with footer), package.json, Tailwind config, postcss config, next.config.js, .gitignore, globals.css. UI primitives are no longer in the chassis; the LLM designs the page from inline JSX. Data shape in `lib/data.ts` is LLM-defined per app. This is the within-archetype companion to the substrate rotation in v0.5; per `ANTI_PATTERNS.md` rule 5 v4, sampling across the visible variance real human producers occupy is faithfulness, not distribution-shaping. See `archetypes/tracker/example/` for one possible Tracker shape (the actual generated apps will look quite different).
+
 > **Changelog v3:** Added the static analysis pass between verification and build. This enforces `ANTI_PATTERNS.md` rules 11 (no runtime data fetching) and 12 (no persistent storage) at the build pipeline level. See `SECURITY_ADDITIONS.md` for the SUSPICIOUS_PATTERNS additions. No other behavioral changes from v2.
 
 > **Changelog v2:** Added the verification pass between generation and build. Added `verifier_verdict` and `verifier_notes` columns to apps schema (see `migrations/*/002_add_verifier_columns.sql`). Generator now produces two files (page_tsx, data_ts); README is a separate stage per `PERSONAS.md`. Added cross-reference to `ANTI_PATTERNS.md`.
@@ -8,34 +10,38 @@ The generator takes a prompt + a selected archetype and produces a deployable Ne
 
 ## The chassis-and-slots model
 
-Every archetype has a **chassis** (fixed scaffolding written by us, copied verbatim into every generated app of that archetype) and **slots** (files the LLM produces from a templated prompt).
+Every archetype has a **chassis** (fixed scaffolding copied verbatim into every generated app of that archetype) and **slots** (files the LLM produces from a templated prompt).
 
-The chassis includes:
+The chassis is deliberately thin. It includes only:
 - `package.json` with pinned dependencies (no HTTP clients, no databases, no scraping libs — see `SECURITY.md`)
 - `tailwind.config.ts`
+- `postcss.config.js`
+- `next.config.js`
 - `tsconfig.json`
 - `.gitignore`
-- `app/layout.tsx` (with the Vibe Mill footer disclaimer baked in)
-- `lib/components/` (archetype-specific UI primitives)
-- `public/favicon.ico` (the Vibe Mill mark)
+- `app/layout.tsx` (with the Vibe Mill footer disclaimer baked in; bare `<main>` wrapper, no width/padding constraints so the page controls its own chrome)
+- `app/globals.css` (just the three @tailwind directives)
+- `public/favicon.ico` (the Vibe Mill mark, when present)
+
+The chassis does NOT include UI primitives. There is no `lib/components/` with preset Counter / MapPanel / Timeline / NewsList. The LLM designs the page from inline JSX, defining whatever sub-components and data shapes fit the topic.
 
 The slots are produced by the LLM in two separate calls:
-- **Generator call:** produces `app/page.tsx` and `lib/data.ts`
+- **Generator call:** produces `app/page.tsx` (free-form JSX) and `lib/data.ts` (free-form data shape)
 - **README call:** produces `README.md` (separate model call, separate prompt; see `PERSONAS.md`)
 
 Slot files are written to disk after both calls succeed and the static analysis pass succeeds. Then chassis + slots are committed together as a single git repo and pushed.
 
 ## Why this architecture
 
-**Output token economy.** A full Next.js app is 50k+ tokens to generate. Letting the LLM write only the slots (typically 5-15k tokens) cuts cost and latency significantly.
+**Within-archetype variance.** Real vibecoded Tracker dashboards vary widely in layout, palette, copy register, and structure (per `ANTI_PATTERNS.md` rule 5 v4). A pre-built UI primitive library would force convergence on the primitives' visual implementation, which empirically produced samey-looking output across substrates. Dropping the primitives lets each app diverge to fit its topic.
 
-**Failure mode reduction.** The chassis files are pre-tested. If the LLM produces broken slot code, the build still has known-good infrastructure around it; the failure surface is smaller.
-
-**Brand consistency.** The footer disclaimer, favicon, meta tags, and consistent Tailwind config come from the chassis. The LLM cannot accidentally remove the disclaimer.
+**Brand consistency.** The footer disclaimer, favicon, meta tags, and consistent Tailwind config come from the chassis. The LLM cannot accidentally remove the disclaimer (it lives in `app/layout.tsx`, which the LLM does not produce).
 
 **Separation of personas.** Generator writes code in service of the app. README writer writes in vibecoder voice. Keeping them separate prevents the personas from bleeding (see `PERSONAS.md`).
 
 **Constraint enforcement.** The chassis pins `package.json` such that no forbidden dependencies (HTTP clients, databases, scraping libraries) are available at build time. Even if the generator hallucinates an import statement for a forbidden package, the build will fail because the package is not installed. This is defense-in-depth alongside the static analysis pass.
+
+**Trade-off accepted.** Output token economy is slightly worse (the LLM writes more JSX rather than just slot data). Build failure rate is somewhat higher (more code surface for the LLM to break). Both are acceptable per ANTI_PATTERNS rule 5 v4: visibly broken outputs ship, and the build retry handles compile-failures with one re-roll. The variance gain is worth the failure-rate floor.
 
 ## Generator prompt template
 

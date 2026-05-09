@@ -1,11 +1,16 @@
 # Tracker example
 
-A working Tracker app filled with example data. The orchestrator does not
-ship this app; it exists to:
+ONE possible Tracker app. The orchestrator does not ship this app; it
+exists to:
 
-1. Document the slot file shape (page.tsx + data.ts) the LLM is expected to
-   produce, alongside the chassis it must compose with.
+1. Show one shape a free-form Tracker might take (free-form because, per
+   GENERATOR.md, the LLM designs the page and chooses its own data shape;
+   the chassis only provides layout, footer, Tailwind, and Next.js config).
 2. Serve as a build fixture for verifying the chassis itself compiles.
+
+The actual generated apps will look quite different from this one — the
+whole point of dropping the chassis primitives was to let the LLM
+diverge widely.
 
 ## Running
 

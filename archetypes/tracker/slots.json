@@ -6,7 +6,6 @@
     {"path": "lib/data.ts", "key": "data_ts"}
   ],
   "readme_slot": {"path": "README.md", "key": "readme_md"},
-  "expected_data_exports": [
-    "title", "tagline", "counters", "regions", "timelineEvents", "newsItems"
-  ]
+  "data_shape": "free-form (LLM-defined per app)",
+  "notes": "The chassis provides only layout.tsx (with the Vibe Mill footer), package.json, Tailwind config, postcss config, next.config.js, .gitignore, and globals.css. There are no preset UI component primitives; the LLM designs the page from inline JSX. See GENERATOR.md and ANTI_PATTERNS.md rule 5 v4 for rationale (within-archetype variance via free-form design)."
 }

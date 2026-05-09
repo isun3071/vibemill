@@ -91,8 +91,12 @@ def _stage_chassis(
     """Copy the chassis into a tempdir, write the slot files, return the path."""
     work = Path(tempfile.mkdtemp(prefix="vibemill-build-"))
     shutil.copytree(src_chassis, work, dirs_exist_ok=True)
-    (work / "app" / "page.tsx").write_text(page_tsx)
-    (work / "lib" / "data.ts").write_text(data_ts)
+    page_path = work / "app" / "page.tsx"
+    data_path = work / "lib" / "data.ts"
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    page_path.write_text(page_tsx)
+    data_path.write_text(data_ts)
     (work / "README.md").write_text(readme_md or "")
     return work
 

@@ -100,8 +100,12 @@ def _load_fixture(name: str) -> tuple[NewsItem, str]:
 def _stage(chassis: Path, *, page_tsx: str, data_ts: str, readme_md: str) -> Path:
     work = Path(tempfile.mkdtemp(prefix="vibemill-smoke-"))
     shutil.copytree(chassis, work, dirs_exist_ok=True)
-    (work / "app" / "page.tsx").write_text(page_tsx)
-    (work / "lib" / "data.ts").write_text(data_ts)
+    page_path = work / "app" / "page.tsx"
+    data_path = work / "lib" / "data.ts"
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    page_path.write_text(page_tsx)
+    data_path.write_text(data_ts)
     (work / "README.md").write_text(readme_md or "")
     return work
 

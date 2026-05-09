@@ -79,7 +79,7 @@ Chassis and example data per archetype. V0 only fills `tracker/`.
 ```
 archetypes/
 ├── tracker/
-│   ├── chassis/                  # files copied verbatim into every Tracker app
+│   ├── chassis/                  # thin scaffolding copied into every Tracker app
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   ├── tailwind.config.ts
@@ -87,17 +87,14 @@ archetypes/
 │   │   ├── next.config.js
 │   │   ├── .gitignore
 │   │   ├── public/
-│   │   │   └── favicon.ico       # vibemill mark
-│   │   ├── app/
-│   │   │   └── layout.tsx        # includes the mill footer disclaimer
-│   │   └── lib/
-│   │       └── components/
-│   │           ├── Counter.tsx
-│   │           ├── MapPanel.tsx
-│   │           ├── Timeline.tsx
-│   │           └── NewsList.tsx
+│   │   │   └── favicon.ico       # vibemill mark (when present)
+│   │   └── app/
+│   │       ├── layout.tsx        # bare <main> + the mill footer disclaimer
+│   │       └── globals.css       # just the @tailwind directives
+│   │   # Note: NO lib/components — per GENERATOR.md v4 the LLM designs the
+│   │   # page from inline JSX. The chassis is intentionally thin.
 │   ├── slots.json                # describes which files the LLM produces
-│   └── example/                  # one fully-working example for reference
+│   └── example/                  # one possible Tracker (also a build fixture)
 │       ├── app/page.tsx
 │       ├── lib/data.ts
 │       └── README.md
