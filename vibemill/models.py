@@ -107,6 +107,17 @@ class GeneratorOutput(BaseModel):
     data_ts: str
 
 
+class VerifierLLMResult(BaseModel):
+    """Raw verifier LLM output. Verdict is free text but should be one of the
+    three documented values per GENERATOR.md; we don't enforce with Literal so
+    a slightly off verdict ("looks-good" vs "looks good") still parses."""
+
+    page_tsx: str
+    data_ts: str
+    verdict: str = ""
+    notes: str = ""
+
+
 class LlmCall(BaseModel):
     """One LLM invocation, recorded to the cost ledger."""
 
