@@ -67,6 +67,11 @@ class App(SQLModel, table=True):
     viral_extension_until: str | None = None
     created_at: str | None = None
     retired_at: str | None = None
+    # Added by migration 002. The verifier verdict + notes ship with the
+    # public artifact; they are part of the satirical content (a "looks good"
+    # attestation alongside an actually-broken app is its own bit).
+    verifier_verdict: str | None = None
+    verifier_notes: str | None = None
 
 
 class Rejection(SQLModel, table=True):

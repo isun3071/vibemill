@@ -153,6 +153,8 @@ class AppRecord(BaseModel):
     viral_extension_until: datetime | None = None
     created_at: datetime | None = None
     retired_at: datetime | None = None
+    verifier_verdict: str | None = None
+    verifier_notes: str | None = None
 
 
 class RejectionRecord(BaseModel):
