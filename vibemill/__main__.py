@@ -423,10 +423,16 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         shutil.rmtree(work, ignore_errors=True)
         return "stillborn_publish"
 
-    # 5. Vercel deploy (auto-fires on push; we just create the project + poll)
+    # 5. Vercel deploy. Project is created and deployment is explicitly
+    # triggered (Vercel's auto-deploy-on-push doesn't fire because the
+    # project doesn't exist yet at the moment of the GitHub push).
     deploy_result = None
     try:
-        vercel_deploy.create_project_for_repo(app_id)
+        vercel_deploy.create_project_for_repo(
+            app_id,
+            repo_id=publish_result.repo_id,
+            sha=publish_result.last_commit_sha,
+        )
         deploy_result = vercel_deploy.wait_for_url(app_id)
     except Exception as exc:
         log.error("%s: vercel deploy failed: %s", app_id, exc)

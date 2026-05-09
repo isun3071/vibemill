@@ -30,15 +30,24 @@ class DeployResult:
     public_url: str
 
 
-def create_project_for_repo(name: str) -> dict:
-    """Create the Vercel project linked to vibemill-apps/{name}. Returns
-    the project record. Vercel auto-deploys on the first push to the
-    linked repo's default branch.
+def create_project_for_repo(name: str, *, repo_id: int, sha: str, ref: str = "main") -> dict:
+    """Create the Vercel project linked to vibemill-apps/{name}, then
+    explicitly trigger a deployment of `sha`.
+
+    The explicit trigger is required because the orchestrator pushes commits
+    to GitHub *before* creating the Vercel project, so Vercel's webhook for
+    that push has nowhere to land. Without this trigger, the project sits as
+    a zombie with 0 deployments forever.
     """
     s = get_settings()
     full_repo = f"{s.GITHUB_ORG}/{name}"
     project = vercel.create_project(name, full_repo)
     log.info("vercel_deploy: created project %s -> %s", project.get("id"), full_repo)
+    deployment = vercel.trigger_deployment(name, repo_id=repo_id, sha=sha, ref=ref)
+    log.info(
+        "vercel_deploy: triggered deployment %s for %s sha=%s",
+        deployment.get("id"), name, sha[:7],
+    )
     return project
 
 

@@ -105,6 +105,43 @@ def delete_project(name: str) -> None:
         raise VercelError(f"delete_project {name}: HTTP {r.status_code}: {r.text[:300]}")
 
 
+def trigger_deployment(
+    name: str,
+    *,
+    repo_id: int,
+    sha: str,
+    ref: str = "main",
+    target: str = "production",
+) -> dict[str, Any]:
+    """Manually fire a deployment for a project that's already linked to a
+    GitHub repo.
+
+    Required because the orchestrator pushes to GitHub *before* creating the
+    Vercel project, which means Vercel's webhook for that push has nowhere
+    to land (no project linked yet). After project creation, this call tells
+    Vercel "deploy <sha> on <repo_id> <ref> to the existing project named X."
+
+    Returns the deployment record (includes id, url, readyState).
+    """
+    payload: dict[str, Any] = {
+        "name": name,
+        "target": target,
+        "gitSource": {
+            "type": "github",
+            "repoId": str(repo_id),
+            "ref": ref,
+            "sha": sha,
+        },
+    }
+    r = _request("POST", "/v13/deployments", json=payload)
+    if r.status_code not in (200, 201):
+        raise VercelError(
+            f"trigger_deployment {name} (sha={sha[:7]}): "
+            f"HTTP {r.status_code}: {r.text[:400]}"
+        )
+    return r.json()
+
+
 def list_deployments(project_id: str, *, limit: int = 5) -> list[dict[str, Any]]:
     r = _request(
         "GET",

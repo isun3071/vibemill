@@ -115,6 +115,10 @@ class PublishResult:
     html_url: str
     last_commit_sha: str
     commit_count: int
+    # GitHub's numeric repository id, needed by Vercel's POST /v13/deployments
+    # gitSource.repoId field. Returned by GitHub's POST /orgs/{org}/repos as
+    # response.id; we just pass it through.
+    repo_id: int
 
 
 def derive_author(slug: str) -> tuple[str, str]:
@@ -280,4 +284,5 @@ def publish(
         html_url=repo_data.get("html_url", github.repo_https_url(name)),
         last_commit_sha=last_sha,
         commit_count=count,
+        repo_id=int(repo_data["id"]),
     )
