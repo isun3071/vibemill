@@ -1,11 +1,11 @@
 # Vibe Mill
 
-> **Changelog v2:** Added the verification pass to V0 scope. Added ANTI_PATTERNS.md and THESIS.md to the document map. ANTI_PATTERNS.md is required reading; THESIS.md is recommended for understanding project intent.
+> **Changelog v3:** Updated cadence to every-4-hours (was hourly). Added references to ANTI_PATTERNS rules 11/12/13 in the do-not-improve list. Added SECURITY_ADDITIONS.md to the document map. Updated thesis epigraph to the more recent Karpathy quote.
 
-> "There's a new kind of coding I call 'vibe coding', where you fully give in to the vibes, embrace exponentials, and forget that the code even exists."
-> — Andrej Karpathy, February 2, 2025
+> *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."*
+> — Andrej Karpathy, October 2025
 
-Vibe Mill is a satirical app machine. It produces vibe-coded web applications from news headlines and one-line user prompts on a slow cadence (5–10 per day). The mill does not promise quality. The mill does not promise relevance. The mill ships.
+Vibe Mill is a satirical app machine. It produces vibe-coded web applications from news headlines on a slow cadence (5–10 per day, in bursts every 4 hours). The mill does not promise quality. The mill does not promise relevance. The mill ships.
 
 This document is the operating manual for any AI assistant (Claude Code, Cursor, etc.) working on this codebase.
 
@@ -20,7 +20,7 @@ The satire is bounded. The mill operates honestly:
 - Every generated app discloses, in its footer, that it was machine-produced
 - The mill does not pretend its output is human craft
 - The mill respects content safety (inherits guard-model refusals)
-- The mill does not spam (one email per ship, real unsubscribe)
+- The mill does not spam (one email per ship, real unsubscribe — V1+ feature)
 
 ## What this project is not
 
@@ -38,12 +38,13 @@ This codebase contains design choices that *look* like bugs or code smells but a
 
 Implement only the following in v0:
 
-- **Orchestrator** at `/home/ian/vibemill/` on sunfamily, run hourly via systemd timer
+- **Orchestrator** at `/home/ian/vibemill/` on sunfamily, run every 4 hours via systemd timer (see `deploy/systemd/vibemill.timer`)
 - **News ingestion** from AP and BBC RSS feeds
 - **Guard model pass** (claude haiku via OpenRouter, t=0) for content safety; rejects inherit LLM refusal
 - **Matcher** (claude haiku via OpenRouter, t=0) scoring against the **Tracker** archetype only; threshold 7
 - **Code generator** (DeepSeek V3 via OpenRouter, t=0.7) producing Tracker apps
 - **Verification pass** (DeepSeek V3 via OpenRouter, t=0.3, one-sentence prompt) — informational, not gating
+- **Static analysis** enforcing ANTI_PATTERNS rules 11 and 12 (see `SECURITY.md` and `SECURITY_ADDITIONS.md`)
 - **Readme writer** (claude haiku via OpenRouter) producing vibecoder-persona READMEs
 - **GitHub publisher** creating repos in the `vibemill-apps` org with fake commit history
 - **Vercel deployer** auto-deploying via the Vercel API
@@ -62,6 +63,8 @@ Implement only the following in v0:
 - The rejection sidebar UI
 - Rate limiting (no public surface yet)
 - Authentication of any kind
+- Rescore-on-deeper-context matcher pass (V0.5+ feature)
+- `known_issues` column for tombstone bug reports (V1+ feature)
 
 If you find yourself wanting to build any of the above, **stop and ask the user.**
 
@@ -77,23 +80,27 @@ Read `ANTI_PATTERNS.md` for the full list. The headline rules:
 - Do not add post-deployment error monitoring on generated apps
 - Do not "tighten" the readme persona — its tells are deliberate
 - Do not advertise the satire in user-facing copy
+- **Do not allow runtime data fetching in generated apps** (Rule 11)
+- **Do not allow persistent storage in generated apps** (Rule 12)
+- **Do not scale Vibe Mill to multiple parallel instances** (Rule 13)
 
 ## Document map
 
 For implementation details, read these in order:
 
-- **`THESIS.md`** — why this project exists at the intellectual level. Read first if you're trying to understand project intent; the operational docs explain the how, not the why.
+- **`THESIS.md`** — why this project exists at the intellectual level. Read first if you're trying to understand project intent; the operational docs explain the how, not the why. Articulates the four pillars (Operationalize, Automate, Atomicity, Cheaply).
 - `ARCHITECTURE.md` — system topology, data flow, environments
 - `STACK.md` — concrete library and version choices
 - `migrations/supabase/001_init.sql` + `002_add_verifier_columns.sql` — canonical Postgres schema; SQLite mirrors at `migrations/sqlite/`
 - `ARCHETYPES.md` — the 12 archetype specifications
 - `MATCHER.md` — guard + judge prompts and logic
 - `GENERATOR.md` — codegen + verification + retry policy
-- **`ANTI_PATTERNS.md`** — what NOT to improve. Required reading.
+- **`ANTI_PATTERNS.md`** — what NOT to improve. Required reading. Now includes rules 11 (no scraping), 12 (no persistence), 13 (no scaling).
 - `VOICE.md` — brand voice for mill-authored copy
 - `PERSONAS.md` — distinguishing mill voice from generated-readme voice
 - `OPERATIONS.md` — rotation, rate limits, content policy, failure modes
 - `SECURITY.md` — token handling, env vars, no-commit list
+- `SECURITY_ADDITIONS.md` — patches to SUSPICIOUS_PATTERNS for ANTI_PATTERNS rules 11/12 enforcement
 - `README.md` — dev setup and deploy steps
 - `DIRECTORY.md` — repository structure
 
@@ -107,6 +114,8 @@ For implementation details, read these in order:
 - No hyphens in informal contexts where they read AI-generated
 
 This applies to commit messages, code comments, log strings, error messages, and any documentation produced by AI assistants on this project.
+
+**Note:** the readme writer (separate persona) does NOT follow these rules. It deliberately uses "seamlessly", marketing-speak, etc. because those are characteristic of the vibecoder voice it imitates. See `PERSONAS.md` for the persona separation.
 
 ## Workflow rules
 

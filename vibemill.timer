@@ -1,0 +1,16 @@
+[Unit]
+Description=Vibe Mill orchestrator — runs every 4 hours producing satirical apps from news headlines
+Requires=vibemill.service
+
+[Timer]
+# Six ticks per day at 02:00, 06:00, 10:00, 14:00, 18:00, 22:00 local time
+# This cadence matches human vibecoder bursting patterns (2-3 apps per "session")
+# rather than continuous content-farm output, and produces ~10 apps/day at steady
+# state — calibrated to LIVE_APP_CAP=100 with ~10-11 day average lifespan.
+OnCalendar=*-*-* 02,06,10,14,18,22:00:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=vibemill.service
+
+[Install]
+WantedBy=timers.target
