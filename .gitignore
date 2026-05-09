@@ -52,3 +52,6 @@ Thumbs.db
 # Build artifacts and tempdirs
 /tmp/vibemill-build-*/
 .uv-cache/
+
+# One-off probe scripts (auth smoke checks); NEVER commit these
+scripts/probe_*.py
