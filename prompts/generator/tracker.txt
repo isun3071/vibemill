@@ -8,6 +8,14 @@ Context:
 - News headline: {{source_headline}}
 - News summary: {{source_summary}}
 
+If a "Source material from web search" block appears at the bottom of
+this prompt, treat those snippets as factual foundation for your
+hardcoded data. Use the real numbers, names, dates, and events you
+find there. Fabricated metrics, status labels, and visual decoration
+are still fine where the search results don't cover the gap. The
+named-attribution constraint applies regardless of whether sources
+are present.
+
 Your output produces three files. A layout wrapper provides the page
 chrome (an html/body shell, a footer, and the Tailwind directives) so
 you don't write those.

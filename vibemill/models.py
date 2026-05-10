@@ -49,7 +49,7 @@ ArchetypeName = Literal[
 ]
 
 GuardDecision = Literal["pass", "reject"]
-LlmPurpose = Literal["guard", "matcher", "generator", "readme", "name"]
+LlmPurpose = Literal["guard", "matcher", "generator", "readme", "name", "search"]
 AppStatus = Literal["live", "archived", "stillborn", "viral"]
 DeathCause = Literal["rotation", "manual", "never_built"]
 RejectionStage = Literal["guard", "matcher"]
@@ -174,6 +174,11 @@ class AppRecord(BaseModel):
     readme_model: str | None = None
     committed_path: bool = False
     readme_persona: str | None = None
+    # Migration 006: three-tier output calibration.
+    tier: str | None = None  # 'slop' | 'mean_good' | 'banger'
+    web_searched: bool = False
+    search_queries_count: int = 0
+    search_total_cost: float = 0.0
 
 
 class RejectionRecord(BaseModel):

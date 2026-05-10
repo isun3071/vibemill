@@ -227,30 +227,49 @@ If a generator call returns a rate-limit error from OpenRouter (429 or provider-
 
 Both the generator's slug and the README's slug land in the SQLite `apps` table (columns `generator_model`, `readme_model`, added by migration 003) and mirror to Supabase. **The model identity does NOT appear in the generated app's footer.** Per ANTI_PATTERNS rule 10 (do not advertise the satire), the canonical footer copy from `VOICE.md` is unchanged. Recording the model identity for fingerprint-pattern analysis is operational instrumentation; displaying it in the artifact would turn the app into a self-aware demo.
 
-## Committed-path workflow
+## Three-tier output calibration
 
-Per generation, the orchestrator rolls a single die at probability `COMMITTED_PATH_PROBABILITY` (default 7%). When the die fires, this generation goes through the **committed path**:
+Supersedes the v0.5 committed-path workflow. Per generation, the orchestrator rolls a tier from `vibemill/tiers.py:TIER_WEIGHTS`:
 
-1. **Force the substrate.** Generator + verifier use the highest-weighted reasoning-enabled member of the pool (DeepSeek V4 Flash at medium reasoning by default). README still rotation-matched to the (forced) generator slug.
-2. **Stuff article context.** Orchestrator fetches the source URL and appends the first `COMMITTED_PATH_ARTICLE_CHARS` (default 2000) of stripped HTML text to the generator prompt. Best-effort: any fetch failure (timeout, non-2xx, non-text content) silently falls back to no extra context.
-3. **Raise the build-retry cap.** Up to `COMMITTED_PATH_BUILD_ATTEMPTS` (default 4) build attempts before stillborn, vs. 2 on the regular path.
-4. **Persist the flag.** `apps.committed_path = true` so the cemetery (V1+) can show the corpus split.
+| Tier | Weight | Behavior | Estimated cost |
+|---|---|---|---|
+| `slop` | 10% | No web search. Standard substrate rotation. 1 build retry (2 attempts). Hardcoded fabricated data. | ~$0.05/app |
+| `mean_good` | 82% | Web search (up to 3 queries via Tavily). Standard substrate rotation. 1 build retry. Real-data foundation, fabricated decoration. | ~$0.30/app |
+| `banger` | 8% | Web search (up to 6 queries). Reasoning-enabled substrate (highest-weighted reasoning-enabled pool member). 3 build retries (4 attempts). Real data primary. Sets `apps.committed_path = true` for backwards compatibility. | ~$0.70/app |
 
-### Why this is faithful, not score-routing
+The dice roll is **independent of input score, archetype, or any other signal** — purely random sampling. Per ANTI_PATTERNS rule 5 v4, this samples the producer-population's distribution of effort faithfully rather than routing on quality.
 
-The dice roll is **independent of input score** (matcher, guard, archetype, headline content — all uncorrelated with the roll). The substrate distribution claim from rule 5 v4 is preserved: low-quality news still has the same chance as high-quality news of being committed-path-sampled.
+### Why three tiers, not two or one
 
-The committed-QA cohort is real: a measurable subset of vibecoders DO ground via article-stuffing, debug-iterate 2-3x, and pick a stronger model. Refusing to sample them in the corpus would be its own distortion of the producer population. Routing based on input quality (the original brief that got pushed back) is what would violate rule 5 v4. Random sampling does not.
+The single-tier (hardcoded-fabrication-only) modal output sat below the genre-faithful baseline. Real hackathon teams ground in real data via APIs and web search. The earlier output was dismissible as obvious AI slop, which weakens the load-bearing satirical claim that an app can autonomously make other apps at hackathon quality. See `THESIS.md` "Calibration: indistinguishability from mean good hackathon team output."
 
-### What the committed path is NOT
+The three tiers preserve the original satirical content (slop tier = original verifier-attesting-to-garbage), establish the new modal output (mean_good = genre-indistinguishable), and demonstrate the ceiling (banger = committed-QA work).
 
-- It is **not** a quality gate that filters out bad apps. The verifier's "looks good" attestation is unchanged. Most committed-path apps will still be slop; the artifact is the random distribution of effort, not curated quality.
-- It is **not** a tier system. There's no "premium" output. Committed-path apps still ship with the same footer disclaimer, the same naming pool, the same retirement policy.
-- It is **not** advertised in the artifact. Per rule 10, the committed_path flag stays in the SQLite/Supabase records; the generated app does not announce its workflow.
+### Web search
 
-### Cost implications
+`vibemill/web_search.py` runs the per-tier search plan via the configured provider (`WEB_SEARCH_PROVIDER`, default `tavily`). Tavily's REST API at `https://api.tavily.com/search`; free tier 1000 searches/month, then ~$0.005/search. Query-construction strategy: headline as primary; "data" / "timeline" / "statistics" / "latest" suffixes for additional queries. Per-query timeout 10s; failures degrade silently to empty results (search is enriching, not required).
 
-A committed-path generation is ~3x the regular cost: deepseek-v4-flash at medium reasoning runs ~$0.84/M effective vs ~$0.28/M nominal, plus up to 4 attempts vs 2 on average means more build retries. At 7% sampling and ~5 apps/tick, expect ~1 committed app every 3 ticks. Daily extra cost: ~$0.05-0.10. Well within the $5/day cap.
+Search costs land in `llm_calls` with `purpose='search'` and `model='<provider>/search'` so the daily cost cap query catches them. Per-app rollup persisted to `apps.search_total_cost`.
+
+To swap providers: add `clients/<provider>.py` with a `search(query, max_results) -> list[SearchResult]` function and a branch in `web_search._dispatch()`. No other code changes required.
+
+### Daily cap and the per-app pre-check
+
+`DAILY_COST_CAP_USD` default tightened from $5 to $3 in v0.5 to accommodate the three-tier calibration. Math: 5 apps/day × $0.30 mean-good + occasional $0.70 banger ≈ $1.80/day; $3 cap gives 1.7x headroom.
+
+Cap behavior is **calm cleanup, not error-abort**:
+
+1. **Tick start:** if `today_cost >= cap`, log `"tick complete: daily cap reached"`, audit-event `tick.cap_reached`, return cleanly.
+2. **Per-app pre-check:** after the tier roll, if `today_cost + tier_cost_estimate > cap`, log the cap-reached message and return `"deferred_cap"`. The tick loop breaks on this outcome.
+3. **Per-app post-check (defensive):** if `today_cost > cap` after a generation, log and break. Catches cases where actual cost overshoots the tier estimate.
+
+The cron timer continues to fire every 4 hours; the cap resets at UTC midnight with no manual intervention. **Manual reset:** `python -m vibemill reset-daily-cost` (destructive: deletes today's `llm_calls` rows; audit-logged).
+
+### What the tier system is NOT
+
+- It is **not** a quality gate. The verifier's "looks good" attestation is unchanged across tiers; some banger-tier apps still ship broken, some slop-tier apps still ship usable.
+- It is **not** advertised in the artifact. Per rule 10, the `tier` column lives in SQLite/Supabase records; the generated app does not announce its tier.
+- It is **not** a curated-API system. The "live-data sub-path" referenced in early planning is V1+ work; v0.5 ships only the web search version.
 
 ## Operational metrics to track
 

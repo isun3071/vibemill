@@ -2,7 +2,7 @@
 
 > *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."* — Andrej Karpathy, October 2025
 
-Vibe Mill is the empirical limit case. Zero bits, continuously, for under $0.10 per app.
+Vibe Mill is the empirical limit case. Zero bits, continuously, for $0.05–$0.70 per app (averaging ~$0.30 across the three-tier output calibration including web-search grounding).
 
 This document explains why the project exists at the intellectual level. It is the only place in the codebase where the satire is named directly. The user-facing copy (about page, app footers, cemetery captions) describes what the mill does factually and lets the reader draw their own conclusions; this document is for the reader who wants to know what conclusions were intended.
 
@@ -17,7 +17,7 @@ That sentence is the project. Every clause is a pillar. The rest of this documen
 1. **Operationalize.** The satire is method, not content.
 2. **Automate.** The pipeline is fully autonomous, which means no human learning happens during production.
 3. **Atomicity.** Human ideation is composite, not atomic; some sub-processes are mechanizable.
-4. **Cheaply.** Apps cost under $0.10; the human cost of the comparable hackathon submission is measured in sleep, money, and bodies.
+4. **Cheaply.** Apps cost $0.05–$0.70 (averaging ~$0.30 across the three tiers, including web-search grounding for the modal output); the human cost of the comparable hackathon submission is measured in sleep, money, and bodies.
 
 Each pillar carries its own argument. They interlock without collapsing into each other.
 
@@ -158,7 +158,7 @@ Pillar 3 said: conception is composite, some sub-processes are mechanizable. Thi
 
 ### The cost asymmetry is moral, not just economic
 
-Vibe Mill produces apps for under $0.10 each. The exact figures vary with token usage and archetype; the order of magnitude is stable. Each app costs less than a small coffee.
+Vibe Mill produces apps for $0.05–$0.70 each, averaging ~$0.30 across the three-tier output calibration (slop ~$0.05, mean-good ~$0.30, banger ~$0.70). The exact figures vary with token usage, archetype, and whether web-search grounding fires. Each app costs less than a small coffee; the average is roughly the price of a stick of gum.
 
 In the same 36 hours that one HackMIT team produces one project, Vibe Mill produces ~15 apps for roughly $1.30 in LLM tokens.
 
@@ -191,6 +191,26 @@ The discipline to stay at one instance is part of the demonstration. The threat 
 Pillars 1, 2, and 3 indict structures and institutions. They are intellectually devastating but cool. Pillar 4 is the only pillar with a protagonist: the kid in the dorm room. The satire stands with the kid against the system that is exploiting them. The emotional content is the satirical content. *Vibe Mill exists, in part, because nobody else is telling the kid the truth about what the artifact they just bled for is actually worth in the credentialing economy.*
 
 This is also where Vibe Mill connects to the rest of the author's work. Operation Clarissa's engagement-substrate problem identifies the same shape of cost asymmetry in a different domain: even the engaged 20% of workers experiences security as a tax on their actual work. Vibe Mill's Pillar 4 is the credentialing-pipeline version of the same observation. *The pipeline asks individuals to subsidize structural inadequacies with their bodies and their time*. Pillar 4 is the bridge.
+
+## Calibration: indistinguishability from mean good hackathon team output
+
+The satirical force of Vibe Mill depends on producing apps that are operationally indistinguishable from what a mean-good hackathon team ships. The proposition "an app can autonomously make other apps at hackathon quality" is the load-bearing claim. If Vibe Mill's modal output reads as obvious AI slop, the proposition is dismissible: "yes, machines can produce slop, but they cannot produce what we produce."
+
+Real hackathon teams use real data — APIs, public datasets, web search to cite real numbers. The published research on hackathon-winning patterns documents this consistently. Vibe Mill's earlier hardcoded-fabrication-only output sat below the genre-faithful baseline; the satire was weaker for it.
+
+The three-tier output calibration corrects this:
+
+- **Slop (~10% of generations).** Hardcoded fabricated data. No web search. Single attempt + 1 retry. ~$0.05/app. Represents the abandoned/late-night/ship-and-forget vibecoder. *This tier preserves the original verifier-attesting-to-garbage satirical content.*
+
+- **Mean good (~82% of generations, the new modal output).** Web search provides real-data foundation; fabricated metrics, statuses, and decoration sit on top. Standard substrate rotation. ~$0.30/app. **This is the tier calibrated to genre indistinguishability.** When a hiring manager looks at the corpus and cannot tell which apps came from Vibe Mill and which from a hackathon, the demonstration lands.
+
+- **Banger (~8%).** Web search with more queries, reasoning-enabled model, 4 build attempts. ~$0.70/app. Represents the committed-QA cohort that actually ships portfolio-grade work occasionally. *This tier demonstrates the ceiling.*
+
+Tier selection is a random unconditional dice roll, independent of input score, archetype, headline content, or any other signal. Per ANTI_PATTERNS rule 5 v4, this samples the producer-population's distribution faithfully rather than routing on quality.
+
+The rule 2 anti-pattern ("do not add hallucination suppression") is deliberately softened by tier 2/3. The justification is that real producers ground in real data; refusing to sample them faithfully is itself a distortion. The hallucination property is preserved on the slop tier (10%) and on the fabricated-decoration layer of tier 2/3, so the corpus retains the genre's overconfidence-and-hallucination signature where it should.
+
+The verifier's "looks good" attestation reads differently per tier. On slop, it's the original ironic content (verifier blesses garbage). On tier 2/3, "looks good" is sometimes approximately true, which is *also* genre-faithful: real Cursor/Claude Code verifiers also rubber-stamp decent work. The satirical payload shifts from per-app irony to corpus-distribution irony — the corpus contains both the verifier-blessing-slop case and the verifier-blessing-decent-work case, and the reader walks away knowing the verifier signal carries no actual quality information either way.
 
 ---
 

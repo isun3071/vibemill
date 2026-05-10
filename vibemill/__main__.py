@@ -44,8 +44,10 @@ from . import (
     screenshot,
     security,
     snapshot,
+    tiers,
     vercel_deploy,
     verify,
+    web_search,
 )
 from .clients import openrouter, supabase
 from .config import get_settings
@@ -137,44 +139,6 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
 # ============================================================================
 # Per-app pipeline
 # ============================================================================
-
-
-_ARTICLE_FETCH_TIMEOUT_S = 10
-
-
-def _fetch_article_excerpt(url: str, max_chars: int) -> str:
-    """Best-effort fetch of the source article URL for committed-path
-    context-stuffing. Returns up to `max_chars` of stripped text, or empty
-    string on any failure (network error, non-2xx, binary content, etc.).
-
-    Strips HTML tags crudely; the LLM tolerates noisy excerpts. We do not
-    use a full HTML parser to keep deps minimal.
-    """
-    if max_chars <= 0:
-        return ""
-    try:
-        import re as _re
-
-        import httpx as _httpx
-        r = _httpx.get(
-            url,
-            timeout=_ARTICLE_FETCH_TIMEOUT_S,
-            follow_redirects=True,
-            headers={"user-agent": "vibemill/0.5 (+https://vibemill.dev)"},
-        )
-        if r.status_code != 200:
-            return ""
-        ctype = r.headers.get("content-type", "")
-        if "html" not in ctype and "text" not in ctype:
-            return ""
-        text = _re.sub(r"<script[\s\S]*?</script>", " ", r.text, flags=_re.IGNORECASE)
-        text = _re.sub(r"<style[\s\S]*?</style>", " ", text, flags=_re.IGNORECASE)
-        text = _re.sub(r"<[^>]+>", " ", text)
-        text = _re.sub(r"\s+", " ", text).strip()
-        return text[:max_chars]
-    except Exception as exc:
-        log.warning("article fetch failed for %s: %s", url, exc)
-        return ""
 
 
 def _is_rate_limit_error(exc: BaseException) -> bool:
@@ -316,35 +280,50 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         source_summary=item.summary,
     )
 
-    # Roll the committed-path dice INDEPENDENT of input score. ~7% of
-    # generations sample the real-vibecoder cohort that grounds via
-    # article-stuffing, debug-iterates 2-3x, and uses a higher-effort
-    # model. See OPERATIONS.md "Committed-path workflow" and ANTI_PATTERNS
-    # rule 5 v4. The substrate distribution claim is preserved: committed
-    # path firing is uncorrelated with input quality.
-    import random as _random
-    committed_path = _random.random() < settings.COMMITTED_PATH_PROBABILITY
+    # Roll the tier dice INDEPENDENT of input score. The tier determines
+    # whether to web-search, the build-retry cap, and whether reasoning is
+    # forced. Per ANTI_PATTERNS rule 5 v4, this samples the real-producer
+    # variance (slop / mean good / banger) faithfully. Substrate
+    # distribution claim is preserved because the tier roll is uncorrelated
+    # with input quality, archetype, etc.
+    tier = tiers.pick_tier()
+    tier_cfg = tiers.get_config(tier)
+    committed_path = tier == tiers.TIER_BANGER  # backwards-compat with migration 004
 
-    if committed_path:
-        gen_model = model_rotation.pick_committed(pool)
-        max_build_attempts = settings.COMMITTED_PATH_BUILD_ATTEMPTS
-        article_excerpt = _fetch_article_excerpt(
-            item.url, settings.COMMITTED_PATH_ARTICLE_CHARS
-        )
+    # Daily cap pre-check: would this generation push us over? Defer
+    # gracefully if so (no further apps this tick).
+    pre_cost = db.today_cost_usd()
+    if pre_cost + tier_cfg.estimated_cost_usd > settings.DAILY_COST_CAP_USD:
         log.info(
-            "==> SHIPPING %s [COMMITTED PATH] | archetype=tracker score=%d | generator=%s reasoning=%s | article_chars=%d | retries=%d | headline=%r",
-            app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
-            len(article_excerpt), max_build_attempts - 1, item.headline[:120],
+            "tick complete: daily cap reached at $%.4f (would-be tier=%s estimate=$%.2f, cap=$%.2f)",
+            pre_cost, tier, tier_cfg.estimated_cost_usd, settings.DAILY_COST_CAP_USD,
         )
+        audit.event(
+            audit.ORCHESTRATOR, "tick.cap_reached",
+            reason=f"spent=$%.4f tier=%s would_add=$%.2f cap=$%.2f"
+            % (pre_cost, tier, tier_cfg.estimated_cost_usd, settings.DAILY_COST_CAP_USD),
+        )
+        return "deferred_cap"
+
+    # Search (tier 2/3 only). Cost lands in llm_calls so the cap query
+    # picks it up retroactively.
+    search_outcome = web_search.run(
+        headline=item.headline, summary=item.summary, tier_cfg=tier_cfg, app_id=app_id,
+    )
+
+    # Generator substrate. Bangers force the reasoning-enabled member of
+    # the pool; mean_good and slop sample via standard rotation.
+    if tier_cfg.force_reasoning:
+        gen_model = model_rotation.pick_committed(pool)
     else:
         gen_model = model_rotation.pick_generator(pool)
-        max_build_attempts = 2
-        article_excerpt = ""
-        log.info(
-            "==> SHIPPING %s | archetype=tracker score=%d | generator=%s reasoning=%s | headline=%r",
-            app_id, m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
-            item.headline[:120],
-        )
+    max_build_attempts = tier_cfg.build_attempts
+
+    log.info(
+        "==> SHIPPING %s [TIER=%s] | archetype=tracker score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
+        app_id, tier.upper(), m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+        len(search_outcome.results), max_build_attempts - 1, item.headline[:120],
+    )
     started = datetime.now(timezone.utc)
 
     # 3. Generate -> verify -> static analysis -> build, with one retry on build
@@ -371,7 +350,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
                 prompt=prompt,
                 item=item,
                 previous_build_error=build_err,
-                extra_context=article_excerpt or None,
+                extra_context=web_search.format_for_prompt(search_outcome) or None,
                 app_id=app_id,
             )
         except generator.GeneratorJSONError as exc:
@@ -437,6 +416,10 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
+            tier=tier,
+            web_searched=bool(search_outcome.results),
+            search_queries_count=search_outcome.queries_count,
+            search_total_cost=search_outcome.cost_usd,
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -466,6 +449,10 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
+            tier=tier,
+            web_searched=bool(search_outcome.results),
+            search_queries_count=search_outcome.queries_count,
+            search_total_cost=search_outcome.cost_usd,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -496,6 +483,10 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
+            tier=tier,
+            web_searched=bool(search_outcome.results),
+            search_queries_count=search_outcome.queries_count,
+            search_total_cost=search_outcome.cost_usd,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -531,6 +522,10 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             readme_model=(readme_model.slug if readme_model else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
+            tier=tier,
+            web_searched=bool(search_outcome.results),
+            search_queries_count=search_outcome.queries_count,
+            search_total_cost=search_outcome.cost_usd,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -567,6 +562,10 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         readme_model=(readme_model.slug if readme_model else None),
         committed_path=committed_path,
         readme_persona=readme_persona,
+        tier=tier,
+        web_searched=bool(search_outcome.results),
+        search_queries_count=search_outcome.queries_count,
+        search_total_cost=search_outcome.cost_usd,
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",
@@ -590,10 +589,12 @@ def run_tick() -> TickResult:
     cap = settings.DAILY_COST_CAP_USD
     spent = db.today_cost_usd()
     if spent >= cap:
-        log.error("daily cost cap exceeded: spent=$%.4f cap=$%.4f; aborting tick", spent, cap)
-        audit.event(audit.ORCHESTRATOR, "tick.abort", reason=f"cost cap: $%.4f >= $%.4f" % (spent, cap))
+        # Calm cleanup; not an error. The cron will restart next tick;
+        # cap resets at UTC midnight. Manual reset: vibemill reset-daily-cost.
+        log.info("tick complete: daily cap reached at $%.4f (cap=$%.2f)", spent, cap)
+        audit.event(audit.ORCHESTRATOR, "tick.cap_reached", reason=f"spent=$%.4f cap=$%.2f" % (spent, cap))
         return TickResult(0, 0, 0, skipped_cost_cap=True)
-    log.info("tick start: today_cost=$%.4f cap=$%.4f", spent, cap)
+    log.info("tick start: today_cost=$%.4f cap=$%.2f", spent, cap)
 
     # Validate the generator pool against OpenRouter's catalog before doing
     # anything expensive. Catches: missing slugs (model retired, typo in
@@ -625,15 +626,22 @@ def run_tick() -> TickResult:
         except Exception as exc:
             log.exception("unexpected error processing %s: %s", item.url, exc)
             continue
+        if outcome == "deferred_cap":
+            # Pre-check inside _ship_one already logged the cap-reached
+            # message and audit-logged it. Stop the tick cleanly.
+            break
         if outcome.startswith("rejected"):
             rejections += 1
         elif outcome.startswith("stillborn"):
             stillborn += 1
         else:
             shipped += 1
-        # Re-check cost cap mid-loop in case generator burned through budget
+        # Defensive post-app cap check (the per-app pre-check should catch
+        # this first; this is a safety net in case actual cost overshoots
+        # the tier estimate).
         if db.today_cost_usd() >= cap:
-            log.error("daily cost cap hit mid-tick; stopping")
+            log.info("tick complete: daily cap reached at $%.4f mid-tick", db.today_cost_usd())
+            audit.event(audit.ORCHESTRATOR, "tick.cap_reached", reason="post-app check")
             break
 
     try:

@@ -74,6 +74,7 @@ def push() -> SnapshotCounts:
     supabase.assert_model_rotation_columns()  # confirms migration 003 on remote
     supabase.assert_committed_path_column()  # confirms migration 004 on remote
     supabase.assert_readme_persona_column()  # confirms migration 005 on remote
+    supabase.assert_tier_columns()  # confirms migration 006 on remote
 
     con = _connect()
     try:

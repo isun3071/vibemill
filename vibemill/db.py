@@ -84,6 +84,11 @@ class App(SQLModel, table=True):
     # Added by migration 005. Which README persona was rolled for this app.
     # See readme_writer.README_PERSONAS.
     readme_persona: str | None = None
+    # Added by migration 006. Three-tier output calibration. See tiers.py.
+    tier: str | None = None
+    web_searched: int = 0
+    search_queries_count: int = 0
+    search_total_cost: float = 0.0
 
 
 class Rejection(SQLModel, table=True):
@@ -237,6 +242,10 @@ def insert_app(record: AppRecord) -> None:
         readme_model=record.readme_model,
         committed_path=1 if record.committed_path else 0,
         readme_persona=record.readme_persona,
+        tier=record.tier,
+        web_searched=1 if record.web_searched else 0,
+        search_queries_count=record.search_queries_count,
+        search_total_cost=record.search_total_cost,
     )
     with session() as s:
         s.add(row)
@@ -403,6 +412,20 @@ def today_cost_usd() -> float:
             text("select coalesce(sum(cost_usd), 0) from llm_calls where called_at >= :start").bindparams(start=start)  # type: ignore[arg-type]
         )
         return float(result.first()[0])  # type: ignore[index]
+
+
+def reset_today_cost() -> int:
+    """Destructive reset: delete llm_calls rows from today (UTC). Returns
+    the number of rows deleted. Caller is responsible for audit-logging.
+    """
+    start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    raw = sqlite3.connect(get_engine().url.database)  # type: ignore[arg-type]
+    try:
+        cur = raw.execute("delete from llm_calls where called_at >= ?", (start,))
+        raw.commit()
+        return cur.rowcount or 0
+    finally:
+        raw.close()
 
 
 # =========================================================================

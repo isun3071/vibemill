@@ -44,17 +44,14 @@ class Settings(BaseSettings):
     README_ROTATION_MODE: str = "match_generator"  # match_generator | fixed
     MAX_OUTPUT_PRICE_USD_PER_M: float = 2.00
 
-    # Probability per generation that the committed-QA path fires. Default 7%
-    # samples the real-vibecoder cohort that grounds via article-stuffing,
-    # debug-iterates 2-3x, and picks a higher-effort model. Independent of
-    # input score (per ANTI_PATTERNS rule 5 v4 + the substrate-rotation
-    # fairness claim). See OPERATIONS.md "Committed-path workflow".
+    # DEPRECATED in v0.5: superseded by the three-tier output calibration
+    # (see vibemill/tiers.py). The banger tier (~8%) replaces the
+    # committed-path mechanism. These vars are no longer read by the
+    # orchestrator; left here only so existing .env files don't trip
+    # pydantic-settings strict-extra checks (extra='ignore' would handle
+    # that anyway, but keeping them documented avoids confusion).
     COMMITTED_PATH_PROBABILITY: float = 0.07
-    # When the committed path fires, allow this many build attempts before
-    # marking stillborn (vs. 2 on the regular path). Counts the first attempt.
     COMMITTED_PATH_BUILD_ATTEMPTS: int = 4
-    # First N chars of the source article URL to fetch and stuff into the
-    # generator prompt on the committed path. 0 disables fetching.
     COMMITTED_PATH_ARTICLE_CHARS: int = 2000
 
     # GitHub
@@ -78,8 +75,18 @@ class Settings(BaseSettings):
     SQLITE_PATH: Path = Path("/home/ian/vibemill/data/vibemill.sqlite")
     LOG_LEVEL: str = "INFO"
 
-    # Spending guardrail (USD)
-    DAILY_COST_CAP_USD: float = 5.00
+    # Spending guardrail (USD). Default tightened in v0.5 to accommodate
+    # the three-tier output calibration (slop ~$0.05, mean_good ~$0.30,
+    # banger ~$0.70) at 5 ships/day with banger-tier headroom.
+    DAILY_COST_CAP_USD: float = 3.00
+
+    # Web search (used by tier 2/3 generations to ground in real data).
+    # Provider modules live in clients/. tavily is the default; setting
+    # a different provider requires a corresponding clients/<provider>.py
+    # module and a branch in web_search._dispatch.
+    WEB_SEARCH_PROVIDER: str = "tavily"
+    WEB_SEARCH_API_KEY: SecretStr = SecretStr("")
+    WEB_SEARCH_MAX_QUERIES: int = 6  # ceiling; per-tier cap is the binding limit
 
     # Live app cap
     LIVE_APP_CAP: int = 100

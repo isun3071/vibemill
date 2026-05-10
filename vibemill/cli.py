@@ -111,6 +111,31 @@ def smoke_cmd(fixture: str | None, keep: bool) -> None:
         sys.exit(1)
 
 
+@cli.command("reset-daily-cost")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt")
+def reset_daily_cost_cmd(yes: bool) -> None:
+    """Destructively reset today's cost ledger (deletes today's llm_calls
+    rows). Use after the daily cap aborted a tick and you want to keep
+    going within the same UTC day."""
+    cost = db.today_cost_usd()
+    if cost == 0.0:
+        console.print("today's cost ledger is already empty (\$0.0000); nothing to reset")
+        return
+    if not yes:
+        click.confirm(
+            f"Delete all llm_calls rows from today (totaling ${cost:.4f})?",
+            abort=True,
+        )
+    deleted = db.reset_today_cost()
+    audit.event(
+        operator=audit.CLI,
+        operation="daily_cost.reset",
+        target=None,
+        reason=f"deleted {deleted} llm_calls rows totaling ~${cost:.4f}",
+    )
+    console.print(f"reset: deleted {deleted} llm_calls rows for today")
+
+
 @cli.command("audit")
 @click.option("--limit", type=int, default=20)
 def audit_cmd(limit: int) -> None:
