@@ -122,7 +122,15 @@ prompts/
 ├── matcher.txt                   # 12-archetype scoring prompt (haiku)
 ├── readme.txt                    # vibecoder-persona README prompt (cheap model)
 └── generator/
-    ├── tracker.txt               # codegen prompt for Tracker (deepseek-v3)
+    ├── tracker/                  # Bundle C: layout-archetype rotation
+    │   ├── dashboard.txt         # ~30%: stat cards + section
+    │   ├── long_form.txt         # ~15%: hero + narrative + sparse data
+    │   ├── map_dominant.txt      # ~15%: full-bleed map + side panel
+    │   ├── chart_dominant.txt    # ~10%: oversized chart, minimal chrome
+    │   ├── editorial.txt         # ~10%: article-style, embedded data
+    │   ├── card_feed.txt         # ~10%: content cards in grid
+    │   ├── list_dominant.txt     # ~5%:  table or scrollable list
+    │   └── split_view.txt        # ~5%:  two-column comparison
     ├── parody-ui.txt             # V1+
     ├── case-file-browser.txt     # V1+
     ├── counter-game.txt          # V1+

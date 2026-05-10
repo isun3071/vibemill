@@ -36,6 +36,7 @@ from . import (
     github_publish,
     guard,
     ingest,
+    layouts,
     matcher,
     model_rotation,
     name_generator,
@@ -150,6 +151,7 @@ def _generate_with_rate_limit_retry(
     prompt: str,
     item: NewsItem,
     tier: str,
+    layout: str,
     previous_build_error: str | None,
     extra_context: str | None,
     app_id: str,
@@ -168,6 +170,7 @@ def _generate_with_rate_limit_retry(
             previous_build_error=previous_build_error,
             extra_context=extra_context,
             tier=tier,
+            layout=layout,
             model=chosen,
             app_id=app_id,
         )
@@ -189,6 +192,7 @@ def _generate_with_rate_limit_retry(
             previous_build_error=previous_build_error,
             extra_context=extra_context,
             tier=tier,
+            layout=layout,
             model=replacement,
             app_id=app_id,
         )
@@ -288,6 +292,11 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     tier_cfg = tiers.get_config(tier)
     committed_path = tier == tiers.TIER_BANGER  # backwards-compat with migration 004
 
+    # Bundle C: layout-archetype roll AFTER tier, BEFORE generation.
+    # Independent of substrate, tier, persona — purely random.
+    layout_choice = layouts.pick_layout()
+    layout = layout_choice.name
+
     # Daily cap pre-check: would this generation push us over? Defer
     # gracefully if so (no further apps this tick).
     pre_cost = db.today_cost_usd()
@@ -318,8 +327,8 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     max_build_attempts = tier_cfg.build_attempts
 
     log.info(
-        "==> SHIPPING %s [TIER=%s] | archetype=tracker score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
-        app_id, tier.upper(), m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+        "==> SHIPPING %s [TIER=%s LAYOUT=%s] | archetype=tracker score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
+        app_id, tier.upper(), layout.upper(), m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
         len(search_outcome.results), max_build_attempts - 1, item.headline[:120],
     )
     started = datetime.now(timezone.utc)
@@ -348,6 +357,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
                 prompt=prompt,
                 item=item,
                 tier=tier,
+                layout=layout,
                 previous_build_error=build_err,
                 extra_context=web_search.format_for_prompt(search_outcome) or None,
                 app_id=app_id,
@@ -416,6 +426,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
+            layout_archetype=layout,
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -450,6 +461,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
+            layout_archetype=layout,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -485,6 +497,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
+            layout_archetype=layout,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -525,6 +538,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
+            layout_archetype=layout,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -566,6 +580,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         search_queries_count=search_outcome.queries_count,
         search_total_cost=search_outcome.cost_usd,
         file_count=len(gen_out.files),
+        layout_archetype=layout,
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",

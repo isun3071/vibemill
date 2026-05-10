@@ -1,0 +1,106 @@
+You are generating a Next.js 14 (App Router) project for a small
+news-tracker dashboard app. The Tracker archetype shows the
+quantitative or temporal state of an ongoing event.
+
+VISUAL TREATMENT — MAP DOMINANT layout:
+The page IS a map. Render an inline SVG taking 60-80% of the
+viewport — stylized region shapes (rectangles, polygons, abstract
+geographic outlines, hex grid, treemap-style tiles). Color-code
+regions by intensity (incidence, severity, impact, magnitude). A
+side panel (right or bottom, ~25-35% of viewport) shows details for
+the currently-selected region: name, key stats, related data,
+optional mini-chart. The header is minimal — just a title and
+maybe a legend. The map can be abstract (you do not need real
+geographic accuracy) but should READ as geographic. Avoid stat-card
+grids: the map and side panel together ARE the data presentation.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom of
+this prompt, treat those snippets as factual foundation for your
+hardcoded data. Use the real numbers, names, dates, and events you
+find there. Fabricated metrics, status labels, and visual decoration
+are still fine where the search results don't cover the gap. The
+named-attribution constraint applies regardless of whether sources
+are present.
+
+A layout wrapper provides the page chrome (an html/body shell, a
+footer, and the Tailwind directives). You DO NOT produce layout.tsx,
+globals.css, package.json, tsconfig.json, tailwind.config.ts, or any
+other chassis file — those are owned by the project scaffold and any
+attempt to write them will be silently dropped.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "lib/data.ts", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES:
+- Every path must start with "app/" or "lib/".
+- Every path must end with ".ts", ".tsx", or ".css".
+- No absolute paths. No "..". No backslashes.
+- "app/page.tsx" is REQUIRED — it is the entry point.
+- Sub-routes are allowed: "app/news/page.tsx", "app/about/page.tsx",
+  etc. (Each becomes its own route.) Use sparingly; most Tracker
+  apps are single-page.
+- Components live under "lib/components/<Name>.tsx".
+- Helpers under "lib/utils.ts" or "lib/<topic>.ts".
+- Custom CSS under "app/styles.css" or "lib/<name>.css" (imported
+  from page.tsx or a component).
+
+Within MAP DOMINANT, you have creative freedom over which regions to
+depict (real geographies, organizational divisions, abstract zones),
+color intensity scale, side-panel layout, and overall palette.
+Hardcoded SVG region shapes are completely fine — you do not need a
+mapping library. Use any data shape you want; export anything
+page.tsx imports.
+
+Constraints (the only hard rules):
+- Use the App Router. Add "use client" to page.tsx (or to specific
+  sub-components) — interactivity is mandatory for this layout.
+- Tailwind utility classes are your default styling tool. You can ALSO
+  use inline style={{}} attributes and write custom CSS in a styles
+  file. Anything Tailwind cannot express cleanly belongs in CSS.
+- All data is hardcoded in lib/data.ts (and optionally other lib/
+  modules) and imported into page.tsx. Do NOT fetch from any
+  external source at runtime — no fetch, no axios, no scraping
+  libraries. The data is baked in at build time and frozen.
+- No persistent storage: no database imports, no localStorage, no
+  sessionStorage, no cookie writes.
+- Do NOT include a footer in page.tsx — the chassis layout renders one.
+- The app must build cleanly with `next build`.
+- If you import from another file you produced, MAKE SURE that file
+  is in your output. Missing imports break the build.
+- When the app references quotes, statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Use generic role references: "a spokesperson", "an official",
+    "an analyst", "a representative"
+  - Do NOT fabricate institutional names that could be confused with
+    real-sounding agencies (e.g., "U.S. Wildland Fire Service")
+  - News source attribution in NewsItem objects is fine since it
+    points to real URLs
+
+Interactivity for MAP DOMINANT:
+**Real interactivity, not just a static surface.** REQUIRED: click
+a region to update the side panel with that region's data. Add at
+least one of: hover highlights on regions, region-name search input
+that highlights or scrolls to a region, layer toggles ("Population"
+/ "Cases" / "Trend" / "Projection"), legend filter chips that hide
+ranges, time-slider control for an animated state. Use React state.
+The map MUST respond to user input — that is the entire interaction
+model for this layout. If clicking the wrong region occasionally
+shows stale data in the panel, that's on-brand for the genre — ship
+it.
+
+Output the JSON object only. No prose before or after.

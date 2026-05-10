@@ -72,18 +72,21 @@ def retire_cmd(app_id: str) -> None:
 @cli.command("smoke-test")
 @click.option("--fixture", default=None, help="Single fixture filename under tests/fixtures/ (default: run all)")
 @click.option("--keep", is_flag=True, help="leave the temp build dir on disk")
-def smoke_cmd(fixture: str | None, keep: bool) -> None:
+@click.option("--layout", default=None, help="Tracker layout to pin (default: dashboard). One of layouts.LAYOUT_NAMES.")
+def smoke_cmd(fixture: str | None, keep: bool, layout: str | None) -> None:
     """Run smoke fixtures end-to-end (LLM pipeline + next build, no GitHub/Vercel).
 
     Default runs all four fixtures: happy_path, guard_reject, matcher_reject,
-    non_tracker_archetype. --fixture NAME runs just one.
+    non_tracker_archetype. --fixture NAME runs just one. --layout NAME pins
+    a different Tracker layout (Bundle C; default 'dashboard').
     """
     from . import smoke_test
+    layout_arg = layout or smoke_test.DEFAULT_SMOKE_LAYOUT
     fixtures = [fixture] if fixture else list(smoke_test.DEFAULT_FIXTURES)
     failures = 0
     for name in fixtures:
         try:
-            result = smoke_test.run_one(name, keep_workdir=keep)
+            result = smoke_test.run_one(name, keep_workdir=keep, layout=layout_arg)
         except smoke_test.SmokeFailure as exc:
             console.print(f"[red][FAIL] {name}: {exc}[/red]")
             failures += 1

@@ -186,6 +186,21 @@ def assert_file_count_column() -> None:
     )
 
 
+def assert_layout_archetype_column() -> None:
+    """Verify migration 008 (layout_archetype text) has been applied to the
+    Supabase apps table. Bundle C: layout-archetype rotation within Tracker."""
+    url = f"{_base()}/rest/v1/apps?select=layout_archetype&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 008 (layout_archetype) is missing on the Supabase apps "
+        f"table. HTTP {r.status_code}: {r.text[:200]}. Apply "
+        "migrations/supabase/008_add_layout_archetype_column.sql manually in "
+        "the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

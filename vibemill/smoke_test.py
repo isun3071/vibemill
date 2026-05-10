@@ -18,9 +18,10 @@ and build, no retry; the build step gets one retry on failure.
 
 Does NOT push to GitHub, deploy to Vercel, or take a screenshot.
 Run via:
-  python -m vibemill.smoke_test                 # all four fixtures
-  python -m vibemill.smoke_test --fixture NAME  # one fixture
-  vibemill smoke-test [--fixture NAME]
+  python -m vibemill.smoke_test                       # all four fixtures, dashboard layout
+  python -m vibemill.smoke_test --fixture NAME        # one fixture
+  python -m vibemill.smoke_test --layout map_dominant # pin a different layout
+  vibemill smoke-test [--fixture NAME] [--layout NAME]
 """
 
 from __future__ import annotations
@@ -36,9 +37,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import db, generator, guard, matcher, model_rotation, readme_writer, security, verify
+from . import db, generator, guard, layouts, matcher, model_rotation, readme_writer, security, verify
 from .config import get_settings
 from .models import NewsItem
+
+DEFAULT_SMOKE_LAYOUT = "dashboard"  # most-weighted layout, modal output
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +133,7 @@ def _run_happy_pipeline(
     *,
     keep_workdir: bool,
     result: SmokeResult,
+    layout: str,
 ) -> None:
     """Generator -> verifier -> static analysis -> stage -> build, with one
     retry on build failure. Mutates `result` in place. Raises SmokeFailure on
@@ -166,7 +170,7 @@ def _run_happy_pipeline(
     build_err: str | None = None
 
     for attempt in (1, 2):
-        log.info("[%s] 3/10 generator (attempt %d)", fixture, attempt)
+        log.info("[%s] 3/10 generator (attempt %d, layout=%s)", fixture, attempt, layout)
         gen = generator.generate(
             archetype="tracker",
             prompt=prompt,
@@ -175,6 +179,7 @@ def _run_happy_pipeline(
             source_summary=item.summary,
             previous_build_error=build_err,
             tier="mean_good",  # smoke pins to mean_good (modal output)
+            layout=layout,  # pinned for reproducibility; override via --layout
             model=smoke_model,
             app_id=f"smoke-{fixture}",
         )
@@ -224,12 +229,23 @@ def _run_happy_pipeline(
     result.workdir = work
 
 
-def run_one(fixture_name: str, *, keep_workdir: bool = False) -> SmokeResult:
+def run_one(
+    fixture_name: str,
+    *,
+    keep_workdir: bool = False,
+    layout: str = DEFAULT_SMOKE_LAYOUT,
+) -> SmokeResult:
     """Run one fixture through the pipeline, classify the outcome, return the
     result. Raises SmokeFailure only on infrastructure failures (build retry
     exhausted, static analysis stillborn on a happy_path fixture, etc.).
     Outcome mismatches set outcome_matched=False but do not raise.
+
+    `layout` (Bundle C) selects the tracker visual layout to pin. Defaults
+    to 'dashboard' (the most-weighted layout). Use other names to verify
+    individual layout templates produce buildable apps.
     """
+    if layout not in layouts.LAYOUT_NAMES:
+        raise ValueError(f"unknown layout '{layout}'; valid: {sorted(layouts.LAYOUT_NAMES)}")
     item, expected = _load_fixture(fixture_name)
     cost_before = db.today_cost_usd()
     result = SmokeResult(fixture=fixture_name, expected_outcome=expected)
@@ -283,7 +299,7 @@ def run_one(fixture_name: str, *, keep_workdir: bool = False) -> SmokeResult:
             "[%s] expected=%s but matcher selected tracker; running happy pipeline anyway",
             fixture_name, expected,
         )
-    _run_happy_pipeline(item, keep_workdir=keep_workdir, result=result)
+    _run_happy_pipeline(item, keep_workdir=keep_workdir, result=result, layout=layout)
     result.outcome = OUTCOME_HAPPY
     result.outcome_matched = (expected == OUTCOME_HAPPY)
 
@@ -296,13 +312,18 @@ def run_one(fixture_name: str, *, keep_workdir: bool = False) -> SmokeResult:
     return result
 
 
-def run_all(*, keep_workdir: bool = False) -> list[SmokeResult]:
-    return [run_one(name, keep_workdir=keep_workdir) for name in DEFAULT_FIXTURES]
+def run_all(*, keep_workdir: bool = False, layout: str = DEFAULT_SMOKE_LAYOUT) -> list[SmokeResult]:
+    return [run_one(name, keep_workdir=keep_workdir, layout=layout) for name in DEFAULT_FIXTURES]
 
 
 # Backward-compat shim for the old single-fixture API.
-def run(fixture: str = "test_news.json", *, keep_workdir: bool = False) -> SmokeResult:
-    return run_one(fixture, keep_workdir=keep_workdir)
+def run(
+    fixture: str = "test_news.json",
+    *,
+    keep_workdir: bool = False,
+    layout: str = DEFAULT_SMOKE_LAYOUT,
+) -> SmokeResult:
+    return run_one(fixture, keep_workdir=keep_workdir, layout=layout)
 
 
 def _print_result(r: SmokeResult) -> None:
@@ -321,6 +342,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke test the LLM pipeline + chassis build")
     parser.add_argument("--fixture", help="Fixture filename under tests/fixtures/ (default: run all)")
     parser.add_argument("--keep", action="store_true", help="Leave the temp build dir on disk")
+    parser.add_argument(
+        "--layout",
+        default=DEFAULT_SMOKE_LAYOUT,
+        choices=sorted(layouts.LAYOUT_NAMES),
+        help=f"Tracker layout to pin (default: {DEFAULT_SMOKE_LAYOUT})",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -331,7 +358,7 @@ def main() -> int:
 
     if args.fixture:
         try:
-            result = run_one(args.fixture, keep_workdir=args.keep)
+            result = run_one(args.fixture, keep_workdir=args.keep, layout=args.layout)
         except SmokeFailure as exc:
             print(f"SMOKE TEST FAILED [{args.fixture}]: {exc}", file=sys.stderr)
             return 1
@@ -341,7 +368,7 @@ def main() -> int:
     failures = 0
     for name in DEFAULT_FIXTURES:
         try:
-            r = run_one(name, keep_workdir=args.keep)
+            r = run_one(name, keep_workdir=args.keep, layout=args.layout)
         except SmokeFailure as exc:
             print(f"SMOKE TEST FAILED [{name}]: {exc}", file=sys.stderr)
             failures += 1

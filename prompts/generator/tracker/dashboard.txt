@@ -2,6 +2,16 @@ You are generating a Next.js 14 (App Router) project for a small
 news-tracker dashboard app. The Tracker archetype shows the
 quantitative or temporal state of an ongoing event.
 
+VISUAL TREATMENT — DASHBOARD layout:
+Lead with a compact header (title, optional status indicator or
+"last updated" timestamp). Follow with a grid of 3-5 prominent
+stat cards showing the key metrics — large numbers, brief labels,
+optional trend arrows or color-coded statuses. Below the stat
+grid, place one or more secondary sections: a sortable table, a
+list of related items, a small chart, a regional breakdown, a
+timeline. Mission-control feel: dense, scannable, multi-modal.
+The stat-card grid is the visual anchor.
+
 Context:
 - Prompt: {{prompt}}
 - News source: {{source_url}}
@@ -47,13 +57,12 @@ PATH RULES:
 - Custom CSS under "app/styles.css" or "lib/<name>.css" (imported
   from page.tsx or a component).
 
-You have creative freedom over layout, palette, typography, and
-component structure. Real dashboards vary widely: some are vertical
-stacks of full-width sections, some are dense multi-column dashboards,
-some lead with a colored hero and pack stats below, some open with an
-oversized hero counter as the focal point, some look like a Bloomberg
-terminal, some look like a public health PSA, some look like a fan
-site. Pick a shape that fits THIS specific story.
+Within DASHBOARD, choose a tinted accent palette (blue, amber, red,
+slate, emerald, indigo, rose, etc.) or stay neutral, whichever fits
+the topic. A health outbreak dashboard should feel different from
+an election results board which should feel different from a
+shipping disruption monitor. Use any data shape you want; export
+anything page.tsx imports.
 
 Constraints (the only hard rules):
 - Use the App Router. Add "use client" to page.tsx (or to specific
@@ -82,27 +91,16 @@ Constraints (the only hard rules):
   - News source attribution in NewsItem objects is fine since it
     points to real URLs
 
-Beyond those, design the project however suits the topic. Use any
-data shape you want; export anything page.tsx imports. Choose a
-tinted accent palette (blue, amber, red, slate, emerald, indigo,
-rose, etc.) or stay neutral, whichever fits. A health outbreak
-tracker should feel different from an election results board which
-should feel different from a shipping disruption monitor.
-
-Style notes:
-- Visually distinctive surface — make real choices about color,
-  typography, layout density, and section ordering. Bland white
-  defaults are a missed opportunity.
-- Hardcoded data should reflect the source context (use plausible-
-  looking values; you do not need to verify real numbers)
-- **Real interactivity, not just a static surface.** Include at least
-  one of: tab navigation between views, filter dropdown, text-input
-  search, sort toggle on a list/table, expand/collapse sections,
-  modal dialog with detail, hover-reveal cards, sortable column
-  headers, paginator on a long list, segmented control. Pick what
-  fits the topic. Use React state (useState / useReducer) backed by
-  your hardcoded data. If a filter silently misbehaves on edge cases
-  or a tab shows partially stale data, that's on-brand for the
-  genre — ship it. The pretense of interactivity is the point.
+Interactivity for DASHBOARD:
+**Real interactivity, not just a static surface.** Pick at least one
+of: tab navigation between view modes (e.g., "Current" / "Historical"
+/ "Forecast"), filter dropdown that narrows the data shown in the
+stat grid or a table, sort toggle on a table or list, hover-reveal
+detail tooltips on stat cards, expand/collapse for secondary
+sections, modal dialog with metric detail. Use React state
+(useState / useReducer) backed by your hardcoded data. If a filter
+silently misbehaves on edge cases or a tab shows partially stale
+data, that's on-brand for the genre — ship it. The pretense of
+interactivity is the point.
 
 Output the JSON object only. No prose before or after.

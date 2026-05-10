@@ -193,6 +193,8 @@ class AppRecord(BaseModel):
     search_total_cost: float = 0.0
     # Migration 007: multi-file generation.
     file_count: int | None = None
+    # Migration 008: Bundle C layout-archetype rotation within Tracker.
+    layout_archetype: str | None = None
 
 
 class RejectionRecord(BaseModel):

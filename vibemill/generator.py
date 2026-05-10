@@ -32,6 +32,7 @@ from pydantic import ValidationError
 
 from .clients import openrouter
 from .config import get_settings
+from .layouts import LAYOUT_NAMES
 from .model_rotation import ModelChoice
 from .models import GeneratedFile, GeneratorOutput
 
@@ -129,14 +130,25 @@ def _file_count_guidance(tier: str | None) -> str:
     return _TIER_FILE_GUIDANCE.get(tier or "mean_good", _TIER_FILE_GUIDANCE["mean_good"])
 
 
-def _prompt_path(archetype: str) -> Path:
-    return get_settings().prompts_dir / "generator" / f"{archetype}.txt"
+def _prompt_path(archetype: str, layout: str | None = None) -> Path:
+    """Resolve the generator prompt path. Tracker uses Bundle C per-layout
+    subdirectories: prompts/generator/tracker/{layout}.txt. Other archetypes
+    (none yet, V1+) fall back to the flat prompts/generator/{archetype}.txt."""
+    base = get_settings().prompts_dir / "generator"
+    if layout:
+        return base / archetype / f"{layout}.txt"
+    return base / f"{archetype}.txt"
 
 
-def _load_template(archetype: str) -> str:
-    path = _prompt_path(archetype)
+def _load_template(archetype: str, layout: str | None = None) -> str:
+    if layout and layout not in LAYOUT_NAMES:
+        raise ValueError(f"unknown layout '{layout}' for archetype '{archetype}'")
+    path = _prompt_path(archetype, layout)
     if not path.exists():
-        raise FileNotFoundError(f"no generator prompt for archetype '{archetype}': {path}")
+        raise FileNotFoundError(
+            f"no generator prompt for archetype '{archetype}'"
+            f"{f' layout {layout!r}' if layout else ''}: {path}"
+        )
     return path.read_text()
 
 
@@ -201,6 +213,7 @@ def generate(
     source_summary: str,
     model: ModelChoice,
     tier: str | None = None,
+    layout: str | None = None,
     previous_build_error: str | None = None,
     extra_context: str | None = None,
     app_id: str | None = None,
@@ -208,11 +221,15 @@ def generate(
     """Run the generator. One retry on malformed JSON or invalid file set.
 
     `tier` selects the file-count guidance substituted into the prompt.
+    `layout` (Bundle C) selects which tracker layout template to load; for
+    archetype='tracker' it is required at the orchestrator layer (the tick
+    rolls one before calling this), but it's typed Optional so smoke tests
+    or scripts can omit it for non-tracker archetypes.
     `previous_build_error`, if set, signals a build-failure retry: the prompt
     is appended with the error and an instruction to fix it. Two malformed
     failures in one call raise GeneratorJSONError.
     """
-    template = _load_template(archetype)
+    template = _load_template(archetype, layout=layout)
     user_prompt = _render(
         template,
         prompt=prompt,
@@ -236,8 +253,8 @@ def generate(
         )
 
     log.info(
-        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, tier=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
-        model.slug, model.reasoning_effort, archetype, tier, len(user_prompt), user_prompt,
+        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, layout=%s, tier=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
+        model.slug, model.reasoning_effort, archetype, layout, tier, len(user_prompt), user_prompt,
     )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:

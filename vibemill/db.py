@@ -91,6 +91,9 @@ class App(SQLModel, table=True):
     search_total_cost: float = 0.0
     # Added by migration 007. Bundle D: multi-file generation.
     file_count: int | None = None
+    # Added by migration 008. Bundle C: layout-archetype rotation within Tracker.
+    # See layouts.LAYOUT_WEIGHTS for the 8 possible values.
+    layout_archetype: str | None = None
 
 
 class Rejection(SQLModel, table=True):
@@ -249,6 +252,7 @@ def insert_app(record: AppRecord) -> None:
         search_queries_count=record.search_queries_count,
         search_total_cost=record.search_total_cost,
         file_count=record.file_count,
+        layout_archetype=record.layout_archetype,
     )
     with session() as s:
         s.add(row)
