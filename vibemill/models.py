@@ -100,24 +100,36 @@ class MatcherResult(BaseModel):
     reasoning: str = ""
 
 
-class GeneratorOutput(BaseModel):
-    """The three slot files the generator LLM produces for a Tracker app.
-    `styles_css` may be empty / a single comment when Tailwind covers
-    everything; the file is always present so the chassis import works."""
+class GeneratedFile(BaseModel):
+    """One file in the generator's output. Path is chassis-relative
+    (e.g. 'app/page.tsx', 'lib/components/Filter.tsx'). Path validation
+    happens in generator.py before staging.
 
-    page_tsx: str
-    data_ts: str
-    styles_css: str = ""
+    Bundle D (multi-file generation): the LLM produces a variable-length
+    list of these per app, sized per tier (slop ~2, mean_good 3-6,
+    banger 4-8). Chassis-owned paths (layout.tsx, globals.css, configs)
+    are silently dropped if the LLM tries to write them.
+    """
+    path: str
+    content: str
+
+
+class GeneratorOutput(BaseModel):
+    """The set of slot files the generator LLM produces for an app.
+    Variable length per tier per Bundle D. Validated for path safety +
+    minimum-required-file (app/page.tsx) in generator.generate."""
+    files: list[GeneratedFile]
 
 
 class VerifierLLMResult(BaseModel):
     """Raw verifier LLM output. Verdict is free text but should be one of the
     three documented values per GENERATOR.md; we don't enforce with Literal so
-    a slightly off verdict ("looks-good" vs "looks good") still parses."""
+    a slightly off verdict ("looks-good" vs "looks good") still parses.
 
-    page_tsx: str
-    data_ts: str
-    styles_css: str = ""
+    Bundle D: verifier returns the same file-list shape as the generator,
+    possibly with edits. If the file list is missing/empty, fall through
+    to the original generator output."""
+    files: list[GeneratedFile] = Field(default_factory=list)
     verdict: str = ""
     notes: str = ""
 
@@ -179,6 +191,8 @@ class AppRecord(BaseModel):
     web_searched: bool = False
     search_queries_count: int = 0
     search_total_cost: float = 0.0
+    # Migration 007: multi-file generation.
+    file_count: int | None = None
 
 
 class RejectionRecord(BaseModel):

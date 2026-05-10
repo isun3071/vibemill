@@ -86,23 +86,18 @@ class TickResult:
 def _stage_chassis(
     src_chassis: Path,
     *,
-    page_tsx: str,
-    data_ts: str,
-    styles_css: str,
+    files: list,  # list[GeneratedFile]
     readme_md: str,
 ) -> Path:
-    """Copy the chassis into a tempdir, write the slot files, return the path."""
+    """Copy the chassis into a tempdir, write each LLM-produced file, return
+    the path. Bundle D: variable file list. Each file's path is chassis-
+    relative; parent dirs created on demand."""
     work = Path(tempfile.mkdtemp(prefix="vibemill-build-"))
     shutil.copytree(src_chassis, work, dirs_exist_ok=True)
-    page_path = work / "app" / "page.tsx"
-    data_path = work / "lib" / "data.ts"
-    styles_path = work / "app" / "styles.css"
-    page_path.parent.mkdir(parents=True, exist_ok=True)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    styles_path.parent.mkdir(parents=True, exist_ok=True)
-    page_path.write_text(page_tsx)
-    data_path.write_text(data_ts)
-    styles_path.write_text(styles_css or "/* (empty) */\n")
+    for f in files:
+        out_path = work / f.path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(f.content)
     (work / "README.md").write_text(readme_md or "")
     return work
 
@@ -154,6 +149,7 @@ def _generate_with_rate_limit_retry(
     archetype: str,
     prompt: str,
     item: NewsItem,
+    tier: str,
     previous_build_error: str | None,
     extra_context: str | None,
     app_id: str,
@@ -171,6 +167,7 @@ def _generate_with_rate_limit_retry(
             source_summary=item.summary,
             previous_build_error=previous_build_error,
             extra_context=extra_context,
+            tier=tier,
             model=chosen,
             app_id=app_id,
         )
@@ -191,6 +188,7 @@ def _generate_with_rate_limit_retry(
             source_summary=item.summary,
             previous_build_error=previous_build_error,
             extra_context=extra_context,
+            tier=tier,
             model=replacement,
             app_id=app_id,
         )
@@ -349,6 +347,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
                 archetype="tracker",
                 prompt=prompt,
                 item=item,
+                tier=tier,
                 previous_build_error=build_err,
                 extra_context=web_search.format_for_prompt(search_outcome) or None,
                 app_id=app_id,
@@ -373,18 +372,14 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             shutil.rmtree(work, ignore_errors=True)
         work = _stage_chassis(
             chassis_dir,
-            page_tsx=verify_outcome.output.page_tsx,
-            data_ts=verify_outcome.output.data_ts,
-            styles_css=verify_outcome.output.styles_css,
+            files=verify_outcome.output.files,
             readme_md=readme_md,
         )
 
         # Static analysis: hard policy gate. No retry on failure.
+        # Bundle D: scan all files in the LLM-produced set.
         sa = security.static_analysis(
-            {
-                "app/page.tsx": verify_outcome.output.page_tsx,
-                "lib/data.ts": verify_outcome.output.data_ts,
-            },
+            {f.path: f.content for f in verify_outcome.output.files},
             archetype="tracker",
         )
         if not sa.safe:
@@ -420,6 +415,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             web_searched=bool(search_outcome.results),
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
+            file_count=(len(gen_out.files) if gen_out else None),
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -453,6 +449,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             web_searched=bool(search_outcome.results),
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
+            file_count=(len(gen_out.files) if gen_out else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -487,6 +484,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             web_searched=bool(search_outcome.results),
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
+            file_count=(len(gen_out.files) if gen_out else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -526,6 +524,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             web_searched=bool(search_outcome.results),
             search_queries_count=search_outcome.queries_count,
             search_total_cost=search_outcome.cost_usd,
+            file_count=(len(gen_out.files) if gen_out else None),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -566,6 +565,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         web_searched=bool(search_outcome.results),
         search_queries_count=search_outcome.queries_count,
         search_total_cost=search_outcome.cost_usd,
+        file_count=len(gen_out.files),
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",

@@ -97,18 +97,14 @@ def _load_fixture(name: str) -> tuple[NewsItem, str]:
     return item, expected
 
 
-def _stage(chassis: Path, *, page_tsx: str, data_ts: str, styles_css: str, readme_md: str) -> Path:
+def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
+    """Bundle D: write the LLM's full file list into a fresh chassis copy."""
     work = Path(tempfile.mkdtemp(prefix="vibemill-smoke-"))
     shutil.copytree(chassis, work, dirs_exist_ok=True)
-    page_path = work / "app" / "page.tsx"
-    data_path = work / "lib" / "data.ts"
-    styles_path = work / "app" / "styles.css"
-    page_path.parent.mkdir(parents=True, exist_ok=True)
-    data_path.parent.mkdir(parents=True, exist_ok=True)
-    styles_path.parent.mkdir(parents=True, exist_ok=True)
-    page_path.write_text(page_tsx)
-    data_path.write_text(data_ts)
-    styles_path.write_text(styles_css or "/* (empty) */\n")
+    for f in files:
+        out_path = work / f.path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(f.content)
     (work / "README.md").write_text(readme_md or "")
     return work
 
@@ -178,17 +174,18 @@ def _run_happy_pipeline(
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=build_err,
+            tier="mean_good",  # smoke pins to mean_good (modal output)
             model=smoke_model,
             app_id=f"smoke-{fixture}",
         )
 
         log.info("[%s] 4/10 verifier (attempt %d)", fixture, attempt)
         v_out = verify.verify(gen, model=smoke_model, app_id=f"smoke-{fixture}")
-        log.info("[%s] verifier verdict=%r", fixture, v_out.verdict)
+        log.info("[%s] verifier verdict=%r files=%d", fixture, v_out.verdict, len(v_out.output.files))
 
         log.info("[%s] 6/10 static analysis (attempt %d)", fixture, attempt)
         sa = security.static_analysis(
-            {"app/page.tsx": v_out.output.page_tsx, "lib/data.ts": v_out.output.data_ts},
+            {f.path: f.content for f in v_out.output.files},
             archetype="tracker",
         )
         result.static_analysis_safe = sa.safe
@@ -199,14 +196,8 @@ def _run_happy_pipeline(
 
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
-        log.info("[%s] 7/10 stage chassis (attempt %d)", fixture, attempt)
-        work = _stage(
-            chassis,
-            page_tsx=v_out.output.page_tsx,
-            data_ts=v_out.output.data_ts,
-            styles_css=v_out.output.styles_css,
-            readme_md=readme,
-        )
+        log.info("[%s] 7/10 stage chassis (attempt %d, %d files)", fixture, attempt, len(v_out.output.files))
+        work = _stage(chassis, files=v_out.output.files, readme_md=readme)
 
         log.info("[%s] 8/10 npm install + next build (attempt %d)", fixture, attempt)
         started = time.monotonic()
@@ -227,7 +218,7 @@ def _run_happy_pipeline(
         shutil.rmtree(work, ignore_errors=True)
 
     result.verifier_verdict = v_out.verdict
-    result.generator_chars = len(v_out.output.page_tsx) + len(v_out.output.data_ts)
+    result.generator_chars = sum(len(f.content) for f in v_out.output.files)
     result.build_ok = True
     result.build_seconds = build_seconds
     result.workdir = work

@@ -53,14 +53,12 @@ def _load_prompt() -> str:
 
 
 def _format_files(generated: GeneratorOutput) -> str:
-    return (
-        "--- app/page.tsx ---\n"
-        + generated.page_tsx
-        + "\n--- lib/data.ts ---\n"
-        + generated.data_ts
-        + "\n--- app/styles.css ---\n"
-        + (generated.styles_css or "/* (empty) */")
-    )
+    """Render every file in the generator output as a labeled block for
+    the verifier prompt. Bundle D: variable-length file list."""
+    parts: list[str] = []
+    for f in generated.files:
+        parts.append(f"--- {f.path} ---\n{f.content}")
+    return "\n".join(parts) if parts else "(no files)"
 
 
 def _extract_json(text: str) -> dict:
@@ -132,13 +130,20 @@ def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None
             )
 
     verdict = _normalize_verdict(parsed.verdict)
-    if verdict == VERDICT_FIXED:
-        out = GeneratorOutput(
-            page_tsx=parsed.page_tsx,
-            data_ts=parsed.data_ts,
-            styles_css=parsed.styles_css or generated.styles_css,
-        )
+    if verdict == VERDICT_FIXED and parsed.files:
+        # Use verifier's edited file list. The verifier may add/remove/edit
+        # files; we trust its output but still validate against the same
+        # path constraints the generator uses (no chassis overwrites, no
+        # path traversal). Filtering happens in generator._validate_output;
+        # we duplicate it here defensively.
+        from .generator import _validate_output as _gen_validate
+        try:
+            out = _gen_validate(GeneratorOutput(files=parsed.files))
+        except ValueError as exc:
+            log.warning("verify: 'fixed issues' verdict but file set invalid (%s); falling through to original", exc)
+            out = generated
     else:
-        # 'looks good' or 'found issues but unsure how to fix': ship original.
+        # 'looks good', 'found issues but unsure how to fix', or fixed-with-empty-files:
+        # ship original.
         out = generated
     return VerifyOutcome(output=out, verdict=verdict, notes=parsed.notes)

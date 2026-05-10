@@ -89,6 +89,8 @@ class App(SQLModel, table=True):
     web_searched: int = 0
     search_queries_count: int = 0
     search_total_cost: float = 0.0
+    # Added by migration 007. Bundle D: multi-file generation.
+    file_count: int | None = None
 
 
 class Rejection(SQLModel, table=True):
@@ -246,6 +248,7 @@ def insert_app(record: AppRecord) -> None:
         web_searched=1 if record.web_searched else 0,
         search_queries_count=record.search_queries_count,
         search_total_cost=record.search_total_cost,
+        file_count=record.file_count,
     )
     with session() as s:
         s.add(row)
