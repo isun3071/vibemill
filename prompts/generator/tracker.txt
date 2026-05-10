@@ -37,8 +37,10 @@ terminal, some look like a public health PSA, some look like a fan
 site. Pick a shape that fits THIS specific story.
 
 Constraints (the only hard rules):
-- Use the App Router. Default to Server Components; only add "use
-  client" if a sub-component genuinely needs interactivity.
+- Use the App Router. Add "use client" to page.tsx (or to specific
+  sub-components) when you need interactivity — and you usually
+  WILL want interactivity. Mean-good hackathon dashboards almost
+  always pretend to be interactive.
 - Tailwind utility classes are your default styling tool. You can ALSO
   use inline style={{}} attributes for one-off custom styling, and you
   can write custom CSS in app/styles.css (gradients, custom keyframe
@@ -75,8 +77,18 @@ Style notes:
   defaults are a missed opportunity.
 - Hardcoded data should reflect the source context (use plausible-
   looking values; you do not need to verify real numbers)
-- Functional logic: dashboards display the data; clicks need not do
-  anything interesting but must not crash
+- **Real interactivity, not just a static surface.** Include at least
+  one of: tab navigation between views, filter dropdown, text-input
+  search, sort toggle on a list/table, expand/collapse sections,
+  modal dialog with detail, hover-reveal cards, sortable column
+  headers, paginator on a long list, segmented control. Pick what
+  fits the topic. Use React state (useState / useReducer) backed by
+  your hardcoded data — no runtime fetch, no localStorage. If a
+  filter silently misbehaves on edge cases or a tab shows partially
+  stale data, that's on-brand for the genre — ship it. The pretense
+  of interactivity is the point. Apps that are pure static reads of
+  data feel like screenshots; apps that respond to clicks (even
+  imperfectly) feel like products.
 - styles.css can be left as just a comment if Tailwind covers
   everything you need — the file is optional in spirit, just always
   present in the JSON output
