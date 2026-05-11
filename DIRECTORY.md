@@ -74,11 +74,14 @@ vibemill/
 
 ## `archetypes/`
 
-Chassis and example data per archetype. V0 only fills `tracker/`.
+Chassis and example data per archetype. Bundle F: the buildable set is
+`tracker`, `chatbot`, `utility_tool`, `search_directory`. Other archetypes
+in the 13-archetype taxonomy exist as stubs and become buildable when
+their chassis + prompt template land in a future bundle.
 
 ```
 archetypes/
-├── tracker/
+├── tracker/                      # buildable
 │   ├── chassis/                  # thin scaffolding copied into every Tracker app
 │   │   ├── package.json
 │   │   ├── tsconfig.json
@@ -91,25 +94,23 @@ archetypes/
 │   │   └── app/
 │   │       ├── layout.tsx        # bare <main> + the mill footer disclaimer
 │   │       └── globals.css       # just the @tailwind directives
-│   │   # Note: NO lib/components — per GENERATOR.md v4 the LLM designs the
-│   │   # page from inline JSX. The chassis is intentionally thin.
+│   │   # Note: NO lib/components — the LLM designs the page from inline JSX.
 │   ├── slots.json                # describes which files the LLM produces
 │   └── example/                  # one possible Tracker (also a build fixture)
 │       ├── app/page.tsx
 │       ├── lib/data.ts
 │       └── README.md
 │
-├── parody-ui/                    # stub in V0 (only directory exists)
-├── case-file-browser/            # stub
-├── counter-game/                 # stub
-├── disruption-visualizer/        # stub
-├── diaspora-map/                 # stub
-├── legal-action-tracker/         # stub
-├── mutual-aid-coordinator/       # stub
-├── wordle-redux/                 # stub
-├── glorified-todo/               # stub
-├── glorified-social/             # stub
-└── recommendation-engine/        # stub
+├── chatbot/                      # buildable (Bundle F); chassis copy of tracker
+├── utility_tool/                 # buildable (Bundle F)
+├── search_directory/             # buildable (Bundle F)
+│
+├── parody_ui/                    # stub (in 13, not yet lit up)
+├── glorified_todo/               # stub
+├── glorified_social/             # stub
+└── recommendation_engine/        # stub
+# Not yet directory-stubbed (also in 13): ai_agent, ai_generator, game,
+# marketplace, map_visualizer
 ```
 
 ## `prompts/`
@@ -119,7 +120,7 @@ Versioned prompt files. Each is plain text with `{{variable}}` placeholders.
 ```
 prompts/
 ├── guard.txt                     # safety check prompt (haiku)
-├── matcher.txt                   # 12-archetype scoring prompt (haiku)
+├── matcher.txt                   # 13-archetype scoring prompt (haiku, Bundle F)
 ├── readme/                       # 12 README personas (Bundle E: +5 from 7)
 │   ├── enthusiastic.txt
 │   ├── minimalist.txt
@@ -134,26 +135,21 @@ prompts/
 │   ├── shitpost.txt              # ironic / self-aware
 │   └── grindset.txt              # 48hr no-sleep energy
 └── generator/
-    ├── tracker/                  # Bundle C: layout-archetype rotation
-    │   ├── dashboard.txt         # ~30%: stat cards + section
-    │   ├── long_form.txt         # ~15%: hero + narrative + sparse data
-    │   ├── map_dominant.txt      # ~15%: full-bleed map + side panel
-    │   ├── chart_dominant.txt    # ~10%: oversized chart, minimal chrome
-    │   ├── editorial.txt         # ~10%: article-style, embedded data
-    │   ├── card_feed.txt         # ~10%: content cards in grid
-    │   ├── list_dominant.txt     # ~5%:  table or scrollable list
-    │   └── split_view.txt        # ~5%:  two-column comparison
-    ├── parody-ui.txt             # V1+
-    ├── case-file-browser.txt     # V1+
-    ├── counter-game.txt          # V1+
-    ├── disruption-visualizer.txt # V1+
-    ├── diaspora-map.txt          # V1+
-    ├── legal-action-tracker.txt  # V1+
-    ├── mutual-aid-coordinator.txt # V1+
-    ├── wordle-redux.txt          # V1+
-    ├── glorified-todo.txt        # V1+
-    ├── glorified-social.txt      # V1+
-    └── recommendation-engine.txt # V1+
+    ├── tracker/                  # Bundle C: layout-archetype rotation (8 layouts)
+    │   ├── dashboard.txt         # ~30%
+    │   ├── long_form.txt         # ~15%
+    │   ├── map_dominant.txt      # ~15%
+    │   ├── chart_dominant.txt    # ~10%
+    │   ├── editorial.txt         # ~10%
+    │   ├── card_feed.txt         # ~10%
+    │   ├── list_dominant.txt     # ~5%
+    │   └── split_view.txt        # ~5%
+    ├── chatbot.txt               # Bundle F: conversational UI + Puter.js/LLM7 AI
+    ├── utility_tool.txt          # Bundle F: single-purpose tool
+    ├── search_directory.txt      # Bundle F: search + browse + detail view
+    # Not yet lit up (matcher will route to "archetype not yet implemented"):
+    # ai_agent, ai_generator, game, glorified_todo, glorified_social,
+    # recommendation_engine, marketplace, map_visualizer, parody_ui
 ```
 
 ## `migrations/`

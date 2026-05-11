@@ -8,9 +8,10 @@ Outcomes the smoke test recognises:
 - happy_path: guard pass, tracker selected, build_ok=True
 - guard_reject: guard returns reject (short-circuits; no matcher call)
 - matcher_reject: guard pass, matcher returns selected_archetypes=[]
-- non_tracker_archetype: guard pass, matcher selects something other
-  than tracker (V0 only ships Tracker; orchestrator would log the
-  rejection with reason 'archetype not yet implemented')
+- non_tracker_archetype: guard pass, matcher selects an archetype
+  outside the buildable set (orchestrator would log the rejection
+  with reason 'archetype not yet implemented'). Bundle F: buildable
+  set is tracker, chatbot, utility_tool, search_directory.
 
 Per ANTI_PATTERNS rule 8 the guard and matcher are separate calls.
 Per GENERATOR.md v3 the static analysis is a hard gate between verify
@@ -133,29 +134,36 @@ def _run_happy_pipeline(
     *,
     keep_workdir: bool,
     result: SmokeResult,
-    layout: str,
+    archetype: str,
+    layout: str | None,
 ) -> None:
     """Generator -> verifier -> static analysis -> stage -> build, with one
     retry on build failure. Mutates `result` in place. Raises SmokeFailure on
-    static-analysis stillborn or build retry exhaustion."""
+    static-analysis stillborn or build retry exhaustion.
+
+    Bundle F: archetype is the matcher's pick (must be in the buildable set);
+    layout is the tracker layout name when archetype=='tracker', else None
+    (other archetypes don't have layout sub-templates yet).
+    """
     settings = get_settings()
-    chassis = settings.archetypes_dir / "tracker" / "chassis"
+    chassis = settings.archetypes_dir / archetype / "chassis"
     prompt = f"{item.headline}. {item.summary}".strip()
     fixture = result.fixture
 
     # Bundle E: single substrate. Pin to mean_good's effort for smoke
     # reproducibility (the tier itself is pinned to mean_good below).
     smoke_model = model_rotation.generator_model_for_tier("mean_good")
-    log.info("[%s] using model=%s reasoning=%s", fixture, smoke_model.slug, smoke_model.reasoning_effort)
+    log.info("[%s] using model=%s reasoning=%s archetype=%s layout=%s",
+             fixture, smoke_model.slug, smoke_model.reasoning_effort, archetype, layout)
 
     # Pin persona to enthusiastic for reproducibility (the actual rotation
     # distribution is tested separately via 1000-roll statistical check).
     smoke_persona = "enthusiastic"
     log.info("[%s] 5/10 readme persona=%s", fixture, smoke_persona)
     readme = readme_writer.write(
-        app_name="smoke-test-tracker",
+        app_name=f"smoke-test-{archetype}",
         prompt=prompt,
-        archetype="tracker",
+        archetype=archetype,
         source_headline=item.headline,
         model=smoke_model,
         persona=smoke_persona,
@@ -168,16 +176,17 @@ def _run_happy_pipeline(
     build_err: str | None = None
 
     for attempt in (1, 2):
-        log.info("[%s] 3/10 generator (attempt %d, layout=%s)", fixture, attempt, layout)
+        log.info("[%s] 3/10 generator (attempt %d, archetype=%s, layout=%s)",
+                 fixture, attempt, archetype, layout)
         gen = generator.generate(
-            archetype="tracker",
+            archetype=archetype,
             prompt=prompt,
             source_url=item.url,
             source_headline=item.headline,
             source_summary=item.summary,
             previous_build_error=build_err,
             tier="mean_good",  # smoke pins to mean_good (modal output)
-            layout=layout,  # pinned for reproducibility; override via --layout
+            layout=layout,  # tracker only; other archetypes pass None
             model=smoke_model,
             app_id=f"smoke-{fixture}",
         )
@@ -281,22 +290,33 @@ def run_one(
         result.cost_usd = db.today_cost_usd() - cost_before
         return result
 
-    if "tracker" not in m.selected_archetypes:
-        # Matcher picked something but not tracker; in V0 the orchestrator
-        # would log this as 'archetype not yet implemented' and reject.
-        result.outcome = OUTCOME_NON_TRACKER
+    # Bundle F: matcher may pick anything from the 13; orchestrator only
+    # ships if the pick lands in the buildable set (tracker / chatbot /
+    # utility_tool / search_directory). Mirror that logic here.
+    picked = matcher.pick(m)
+    if not matcher.is_v0_buildable(picked):
+        result.outcome = OUTCOME_NON_TRACKER  # kept for fixture compat
         result.outcome_matched = (expected == OUTCOME_NON_TRACKER)
-        result.notes = f"selected={m.selected_archetypes}"
+        result.notes = f"picked={picked}, selected={m.selected_archetypes}"
         result.cost_usd = db.today_cost_usd() - cost_before
         return result
 
-    # Happy path: tracker is in selected. Run the full build pipeline.
+    # Happy path: a buildable archetype was picked. Run the full build
+    # pipeline against THAT archetype. Tracker keeps the pinned layout;
+    # other archetypes pass None (no layout sub-rotation in Bundle F).
     if expected != OUTCOME_HAPPY:
         log.warning(
-            "[%s] expected=%s but matcher selected tracker; running happy pipeline anyway",
-            fixture_name, expected,
+            "[%s] expected=%s but matcher picked buildable archetype %s; running happy pipeline anyway",
+            fixture_name, expected, picked,
         )
-    _run_happy_pipeline(item, keep_workdir=keep_workdir, result=result, layout=layout)
+    pipeline_layout = layout if picked == "tracker" else None
+    _run_happy_pipeline(
+        item,
+        keep_workdir=keep_workdir,
+        result=result,
+        archetype=picked,
+        layout=pipeline_layout,
+    )
     result.outcome = OUTCOME_HAPPY
     result.outcome_matched = (expected == OUTCOME_HAPPY)
 

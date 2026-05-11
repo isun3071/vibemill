@@ -210,30 +210,30 @@ def _ship_one(item: NewsItem) -> str:
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                              published_at=item.published_at, guard_status="passed",
                              matched_archetype=picked)
-        log.info("rejected (V0): %s rolled %s, only Tracker ships", item.headline[:60], picked)
+        log.info("rejected: %s rolled %s, not in buildable set", item.headline[:60], picked)
         return "rejected_archetype"
 
-    # We have a Tracker. Mint an id; persist it on the row at the end.
+    # We have a buildable archetype. Mint an id; persist it on the row at the end.
+    archetype = picked
     app_id = name_generator.make_name(
-        archetype="tracker",
+        archetype=archetype,
         source_headline=item.headline,
         source_summary=item.summary,
     )
 
     # Roll the tier dice INDEPENDENT of input score. The tier determines
-    # whether to web-search, the build-retry cap, and whether reasoning is
-    # forced. Per ANTI_PATTERNS rule 5 v4, this samples the real-producer
-    # variance (slop / mean good / banger) faithfully. Substrate
-    # distribution claim is preserved because the tier roll is uncorrelated
-    # with input quality, archetype, etc.
+    # web-search budget, build-retry cap, reasoning effort. Per
+    # ANTI_PATTERNS rule 5 v5, this samples real-producer effort variance.
     tier = tiers.pick_tier()
     tier_cfg = tiers.get_config(tier)
     committed_path = tier == tiers.TIER_BANGER  # backwards-compat with migration 004
 
-    # Bundle C: layout-archetype roll AFTER tier, BEFORE generation.
-    # Independent of substrate, tier, persona — purely random.
-    layout_choice = layouts.pick_layout()
-    layout = layout_choice.name
+    # Bundle C: layout-archetype roll for Tracker only. Other archetypes
+    # use a single prompt template (no layout sub-rotation yet, per Bundle F).
+    if archetype == "tracker":
+        layout: str | None = layouts.pick_layout().name
+    else:
+        layout = None
 
     # Daily cap pre-check: would this generation push us over? Defer
     # gracefully if so (no further apps this tick).
@@ -262,8 +262,9 @@ def _ship_one(item: NewsItem) -> str:
     max_build_attempts = tier_cfg.build_attempts
 
     log.info(
-        "==> SHIPPING %s [TIER=%s LAYOUT=%s] | archetype=tracker score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
-        app_id, tier.upper(), layout.upper(), m.scores.tracker, gen_model.slug, gen_model.reasoning_effort,
+        "==> SHIPPING %s [TIER=%s LAYOUT=%s] | archetype=%s score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
+        app_id, tier.upper(), (layout or "-").upper(), archetype, m.scores.as_dict()[archetype],
+        gen_model.slug, gen_model.reasoning_effort,
         len(search_outcome.results), max_build_attempts - 1, item.headline[:120],
     )
     started = datetime.now(timezone.utc)
@@ -271,7 +272,7 @@ def _ship_one(item: NewsItem) -> str:
     # 3. Generate -> verify -> static analysis -> build, with one retry on build
     # failure (per GENERATOR.md v3). Static analysis is a hard gate with NO
     # retry: a forbidden pattern is a policy violation, not a transient error.
-    chassis_dir = settings.archetypes_dir / "tracker" / "chassis"
+    chassis_dir = settings.archetypes_dir / archetype / "chassis"
     work: Path | None = None
     gen_out: GeneratorOutput | None = None
     verify_outcome = None
@@ -285,7 +286,7 @@ def _ship_one(item: NewsItem) -> str:
     for attempt in range(1, max_build_attempts + 1):
         try:
             gen_out = generator.generate(
-                archetype="tracker",
+                archetype=archetype,
                 prompt=prompt,
                 source_url=item.url,
                 source_headline=item.headline,
@@ -307,7 +308,7 @@ def _ship_one(item: NewsItem) -> str:
         readme_md = readme_writer.write(
             app_name=app_id,
             prompt=prompt,
-            archetype="tracker",
+            archetype=archetype,
             source_headline=item.headline,
             model=readme_choice,
             persona=readme_persona,
@@ -342,8 +343,8 @@ def _ship_one(item: NewsItem) -> str:
     if forbidden_result is not None:
         elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
         db.insert_app(AppRecord(
-            id=app_id, prompt=prompt, archetype="tracker",
-            archetype_score=m.scores.tracker,
+            id=app_id, prompt=prompt, archetype=archetype,
+            archetype_score=m.scores.as_dict()[archetype],
             tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
             source="news",
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
@@ -368,7 +369,7 @@ def _ship_one(item: NewsItem) -> str:
         )
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                              published_at=item.published_at, guard_status="passed",
-                             matched_archetype="tracker", matcher_score=m.scores.tracker,
+                             matched_archetype=archetype, matcher_score=m.scores.as_dict()[archetype],
                              resulted_in_app=app_id)
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
@@ -377,8 +378,8 @@ def _ship_one(item: NewsItem) -> str:
     if not build_ok or gen_out is None or verify_outcome is None:
         elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
         db.insert_app(AppRecord(
-            id=app_id, prompt=prompt, archetype="tracker",
-            archetype_score=m.scores.tracker,
+            id=app_id, prompt=prompt, archetype=archetype,
+            archetype_score=m.scores.as_dict()[archetype],
             tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
             source="news",
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
@@ -400,7 +401,7 @@ def _ship_one(item: NewsItem) -> str:
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                              published_at=item.published_at, guard_status="passed",
-                             matched_archetype="tracker", matcher_score=m.scores.tracker,
+                             matched_archetype=archetype, matcher_score=m.scores.as_dict()[archetype],
                              resulted_in_app=app_id)
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
@@ -417,8 +418,8 @@ def _ship_one(item: NewsItem) -> str:
     except Exception as exc:
         log.error("%s: github publish failed: %s", app_id, exc)
         db.insert_app(AppRecord(
-            id=app_id, prompt=prompt, archetype="tracker",
-            archetype_score=m.scores.tracker, source="news",
+            id=app_id, prompt=prompt, archetype=archetype,
+            archetype_score=m.scores.as_dict()[archetype], source="news",
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
@@ -457,8 +458,8 @@ def _ship_one(item: NewsItem) -> str:
         except Exception as exc2:
             log.warning("%s: github archive after vercel failure also failed: %s", app_id, exc2)
         db.insert_app(AppRecord(
-            id=app_id, prompt=prompt, archetype="tracker",
-            archetype_score=m.scores.tracker, source="news",
+            id=app_id, prompt=prompt, archetype=archetype,
+            archetype_score=m.scores.as_dict()[archetype], source="news",
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             github_url=publish_result.html_url,
             status="stillborn", death_cause="never_built",
@@ -492,8 +493,8 @@ def _ship_one(item: NewsItem) -> str:
 
     # 7. Insert the final app row
     db.insert_app(AppRecord(
-        id=app_id, prompt=prompt, archetype="tracker",
-        archetype_score=m.scores.tracker,
+        id=app_id, prompt=prompt, archetype=archetype,
+        archetype_score=m.scores.as_dict()[archetype],
         tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
         github_url=publish_result.html_url,
         vercel_url=deploy_result.public_url,
@@ -518,7 +519,7 @@ def _ship_one(item: NewsItem) -> str:
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",
-                         matched_archetype="tracker", matcher_score=m.scores.tracker,
+                         matched_archetype=archetype, matcher_score=m.scores.as_dict()[archetype],
                          resulted_in_app=app_id)
     audit.event(audit.ORCHESTRATOR, "app.create", target=app_id,
                 reason=f"shipped from news (verdict={verify_outcome.verdict})")

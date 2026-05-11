@@ -57,94 +57,59 @@ If the guard model itself refuses to evaluate the prompt (returns a refusal rath
 
 ## Stage 2: Matcher (judge)
 
-For inputs that pass the guard, the matcher scores against all 12 archetypes and selects one or rejects.
+For inputs that pass the guard, the matcher scores against all 13 archetypes and selects one or rejects.
 
 ### Prompt: `prompts/matcher.txt`
 
-```
-You are the matcher for Vibe Mill, an automated satirical app generator.
-You score input prompts against twelve possible app archetypes and pick
-the best fit, or reject if none fit well.
+Bundle F revised the taxonomy from 12 content-mixed archetypes to 13 form-rooted archetypes. The current prompt is in `prompts/matcher.txt`; see that file for the canonical text. Summary of the 13:
 
-The twelve archetypes are:
+1. **Tracker** — multi-metric data dashboard for an ongoing quantitative event
+2. **AI agent** — agentic workflow with visible multi-step trace
+3. **Chatbot** — conversational UI for a specific domain
+4. **AI generator** — one-shot input → single AI artifact (deck / image / plan)
+5. **Game** — interactive browser game (counter / Wordle-style / puzzle / viral phrase)
+6. **Glorified to-do** — task manager / checklist / planner
+7. **Glorified social** — niche-community feed/profile/like/comment
+8. **Recommendation engine** — preferences in, ranked recommendation out
+9. **Marketplace** — two-sided list-and-find (offer/need pairing)
+10. **Map visualizer** — map-dominant app (choropleth, region picker, geographic overlay)
+11. **Utility tool** — single-purpose tool (URL shortener, converter, generator-of-a-specific-thing)
+12. **Search directory** — search-and-browse over a curated/scraped collection
+13. **Parody UI** — intentionally absurd / named-entity-in-familiar-interface
 
-1. Tracker — quantifiable ongoing event with geography or timeline
-2. Parody UI — named entity plus content dump in familiar interface
-3. Case-file browser — qualitative documents on rolling release
-4. Counter game — absurd viral phrase or repeated action
-5. Disruption visualizer — choke point with downstream ripples
-6. Diaspora map — scattered group whose tracing is the story
-7. Legal-action tracker — multi-front legal or political campaign
-8. Mutual aid coordinator — service gap with community response
-9. Wordle redux — finite entity space guessable by attributes
-10. Glorified to-do — small life-utility checklist
-11. Glorified social — niche community needing a feed
-12. Recommendation engine — preferences in, single recommendation out
-
-For the given input, score each archetype 0-10 based on how well the input
-fits that archetype's spirit and example domains.
-
-Scoring guide:
-- 0-3: archetype is wrong for this input
-- 4-6: input could stretch into this archetype but it would be a poor fit
-- 7-8: input is a reasonable fit for this archetype
-- 9-10: input is a near-prototypical example of this archetype
-
-Threshold for selection is 7. If no archetype scores 7 or higher, reject
-with reason "no archetype match."
-
-If multiple archetypes tie at the highest score and that score is 7 or
-higher, list all tied archetypes; the orchestrator will randomly select
-among them.
-
-Respond in JSON only:
-
-{
-  "scores": {
-    "tracker": 0,
-    "parody_ui": 0,
-    "case_file_browser": 0,
-    "counter_game": 0,
-    "disruption_visualizer": 0,
-    "diaspora_map": 0,
-    "legal_action_tracker": 0,
-    "mutual_aid_coordinator": 0,
-    "wordle_redux": 0,
-    "glorified_todo": 0,
-    "glorified_social": 0,
-    "recommendation_engine": 0
-  },
-  "selected_archetypes": ["tracker"],  // list of all archetypes at the highest score, if >= 7
-  "reasoning": "one to two sentence rationale for the top score"
-}
-
-Input prompt:
-{INPUT}
-```
+The archetypes describe FORM, not content. A "healthcare" input could plausibly score 8 on tracker AND 7 on chatbot AND 6 on glorified_todo — the topic supports multiple forms, the matcher picks the shape the input most naturally suggests.
 
 ### Tie-breaking
 
 If `selected_archetypes` contains more than one archetype, the orchestrator picks one uniformly at random. The full `scores` object is stored in `rejections.all_scores` (even when the input passes) for transparency and for the rejection sidebar to display occasional "the dice rolled" entries.
 
-### V0 special case
+### Incremental archetype rollout
 
-In V0, only Tracker is implemented. The matcher prompt should still score all 12 (this gives us calibration data for V1) but the orchestrator filters: if the selected archetype is anything other than Tracker, treat as rejection with reason `archetype not yet implemented`.
+The matcher prompt always scores all 13 archetypes (for calibration data and to feed the "dice rolled wrong" satirical content). The orchestrator only ships apps for the **buildable subset**, defined in `matcher.py:_V0_BUILDABLE`.
 
-This is a temporary V0 behavior, removed in V1.
+Bundle F buildable: `tracker`, `chatbot`, `utility_tool`, `search_directory`.
+
+If the dice land on an archetype outside this set (e.g. `ai_generator`, `game`, `marketplace`), the input is rejected with reason `archetype not yet implemented`. Tied-but-lost-the-roll is also rejected. This is the path future bundles widen by adding chassis + prompt template pairs for additional archetypes.
 
 ## Calibration
 
-Before the orchestrator runs in production, run the matcher offline against a fixed set of test inputs and verify the scores look reasonable. Suggested calibration set:
+Before the orchestrator runs in production, run the matcher offline against a fixed set of test inputs and verify the scores look reasonable. Suggested calibration set (Bundle F update):
 
-- "Hantavirus outbreak on cruise ship MV Hondius" → Tracker (high), Diaspora map (high), others low
-- "Pope Leo and Trump tension" → all low (cultural, not data-shaped)
-- "Strait of Hormuz tanker traffic disruption" → Disruption visualizer (high), Tracker (medium)
-- "67 viral phrase keeps appearing in classrooms" → Counter game (high)
-- "Epstein emails released by DOJ" → Parody UI (high), Case-file browser (high)
-- "Trans rights legal cases proliferating across states" → Legal-action tracker (high)
-- "FEMA disaster response capacity changes" → Mutual aid coordinator (high), Tracker (medium)
-- "App for tracking my coffee intake" → Glorified to-do (high), Tracker (medium)
+- "EPA Q1 2026 air quality dashboard for 50 US metros" → Tracker (high)
+- "Hantavirus outbreak on cruise ship MV Hondius" → Tracker (high), others low *[guard may reject in practice]*
+- "Pope Leo and Trump tension" → all low (cultural, not shape-suggesting)
+- "67 viral phrase keeps appearing in classrooms" → Game (high), Glorified social (medium), Parody UI (medium)
+- "Epstein emails released by DOJ" → Search directory (high), Parody UI (medium)
 - "Twitter for declassified UFO researchers" → Glorified social (high)
+- "App for tracking my coffee intake" → Glorified to-do (high), Tracker (medium)
+- "Build me a slide deck from my project description" → AI generator (high), AI agent (medium)
+- "Chatbot that helps freshmen pick CS classes at MIT" → Chatbot (high)
+- "Tool that shortens long URLs and tracks click counts" → Utility tool (high), Tracker (medium)
+- "Site that lets neighbors lend each other power tools" → Marketplace (high)
+- "Browse declassified UFO files by region and decade" → Search directory (high), Map visualizer (medium)
+- "Wordle but for hackathon project names" → Game (high), Parody UI (medium)
+- "Pick the best HackHarvard team to follow based on my interests" → Recommendation engine (high)
+- "Visualize where US tech layoffs hit hardest by county" → Map visualizer (high), Tracker (medium)
 
 Calibration runs should be reproduced after any prompt change to verify the scoring distribution has not drifted.
 

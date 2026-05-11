@@ -13,7 +13,11 @@ Per generation, the orchestrator rolls a single die at fixed weights:
   BANGER     (~8%)  — best-overall hackathon team / committed-QA cohort.
                       Web search (up to 6 queries), reasoning at MEDIUM,
                       4 build attempts. Real data primary, minimal
-                      fabrication. ~$0.70/app.
+                      fabrication. ~$0.70/app. **Produces MVP-form
+                      output: polished across multiple dimensions,
+                      demoable end-to-end, pitch-deck-with-repo shaped.
+                      This tier is Vibe Mill's industrialized-MVPs
+                      surface — see THESIS.md Pillar 2.**
 
 Per ANTI_PATTERNS rule 5 v5 (variance lives at the prompt layer), tier
 selection is the effort-allocation axis, archetype/layout/sub-prize-category

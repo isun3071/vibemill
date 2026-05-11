@@ -18,34 +18,44 @@ from pydantic import BaseModel, Field
 
 
 # Archetype names match the JSON keys the matcher emits (snake_case).
+# Bundle F revised the taxonomy from 12 to 13, rooted in real hackathon
+# project FORMS rather than content. See MATCHER.md and the Bundle F
+# commit message for the rationale. Out: case_file_browser,
+# disruption_visualizer, diaspora_map, legal_action_tracker,
+# mutual_aid_coordinator, counter_game, wordle_redux. In: ai_agent,
+# chatbot, ai_generator, game (merges counter+wordle), marketplace
+# (generalizes mutual_aid), map_visualizer (generalizes diaspora_map),
+# utility_tool, search_directory.
 ARCHETYPE_NAMES: tuple[str, ...] = (
     "tracker",
-    "parody_ui",
-    "case_file_browser",
-    "counter_game",
-    "disruption_visualizer",
-    "diaspora_map",
-    "legal_action_tracker",
-    "mutual_aid_coordinator",
-    "wordle_redux",
+    "ai_agent",
+    "chatbot",
+    "ai_generator",
+    "game",
     "glorified_todo",
     "glorified_social",
     "recommendation_engine",
+    "marketplace",
+    "map_visualizer",
+    "utility_tool",
+    "search_directory",
+    "parody_ui",
 )
 
 ArchetypeName = Literal[
     "tracker",
-    "parody_ui",
-    "case_file_browser",
-    "counter_game",
-    "disruption_visualizer",
-    "diaspora_map",
-    "legal_action_tracker",
-    "mutual_aid_coordinator",
-    "wordle_redux",
+    "ai_agent",
+    "chatbot",
+    "ai_generator",
+    "game",
     "glorified_todo",
     "glorified_social",
     "recommendation_engine",
+    "marketplace",
+    "map_visualizer",
+    "utility_tool",
+    "search_directory",
+    "parody_ui",
 ]
 
 GuardDecision = Literal["pass", "reject"]
@@ -74,17 +84,18 @@ class GuardResult(BaseModel):
 
 class MatcherScores(BaseModel):
     tracker: int = Field(0, ge=0, le=10)
-    parody_ui: int = Field(0, ge=0, le=10)
-    case_file_browser: int = Field(0, ge=0, le=10)
-    counter_game: int = Field(0, ge=0, le=10)
-    disruption_visualizer: int = Field(0, ge=0, le=10)
-    diaspora_map: int = Field(0, ge=0, le=10)
-    legal_action_tracker: int = Field(0, ge=0, le=10)
-    mutual_aid_coordinator: int = Field(0, ge=0, le=10)
-    wordle_redux: int = Field(0, ge=0, le=10)
+    ai_agent: int = Field(0, ge=0, le=10)
+    chatbot: int = Field(0, ge=0, le=10)
+    ai_generator: int = Field(0, ge=0, le=10)
+    game: int = Field(0, ge=0, le=10)
     glorified_todo: int = Field(0, ge=0, le=10)
     glorified_social: int = Field(0, ge=0, le=10)
     recommendation_engine: int = Field(0, ge=0, le=10)
+    marketplace: int = Field(0, ge=0, le=10)
+    map_visualizer: int = Field(0, ge=0, le=10)
+    utility_tool: int = Field(0, ge=0, le=10)
+    search_directory: int = Field(0, ge=0, le=10)
+    parody_ui: int = Field(0, ge=0, le=10)
 
     def as_dict(self) -> dict[str, int]:
         return self.model_dump()

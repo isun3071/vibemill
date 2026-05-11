@@ -129,10 +129,12 @@ _TIER_FILE_GUIDANCE: dict[str, str] = {
     ),
     "banger": (
         "TIER: best-overall hackathon team. The committed-QA cohort that "
-        "actually ships portfolio-grade work. Everything is polished. Real "
-        "data, real interactivity, real componentization, real care. This "
-        "team didn't sleep, and it shows in the artifact — coherent across "
-        "files, considered in its choices, demoable end-to-end.\n\n"
+        "ships MVP-form output: polished across multiple dimensions, "
+        "demoable end-to-end, pitch-deck-with-repo shaped. This is the "
+        "artifact someone would actually show off at Demo Day. Real data, "
+        "real interactivity, real componentization, real care. This team "
+        "didn't sleep, and it shows — coherent across files, considered "
+        "in its choices, the kind of project that wins Best Overall.\n\n"
         "FILE COUNT: produce 4 to 8 files. Required: app/page.tsx and "
         "lib/data.ts. Factor the page into multiple distinct components in "
         "lib/components/, with each file owning one cohesive UI piece. "

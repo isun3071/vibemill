@@ -1,12 +1,15 @@
-"""Matcher: claude haiku scores all 12 archetypes; orchestrator picks one
+"""Matcher: claude haiku scores all 13 archetypes; orchestrator picks one
 or rejects.
 
-V0 special case (per MATCHER.md): the matcher prompt still scores all 12
-for calibration data, but the orchestrator only ships Tracker apps. If the
-random pick from `selected_archetypes` is anything other than 'tracker',
-the input is rejected with reason 'archetype not yet implemented'. The
-random pick — including the case where Tracker tied with another archetype
-and lost the dice roll — is itself satirical content per VOICE.md.
+Bundle F revised the taxonomy to 13 form-archetypes and incrementally
+expanded the buildable set. Currently buildable: tracker, chatbot,
+utility_tool, search_directory. The matcher still scores all 13 for
+calibration data; if the random pick lands on a not-yet-implemented
+archetype (ai_agent, ai_generator, game, marketplace, map_visualizer,
+glorified_todo, glorified_social, recommendation_engine, parody_ui),
+the input is rejected with reason 'archetype not yet implemented'.
+The dice rolling for an unbuildable archetype — including ties where
+a buildable lost the roll — is itself satirical content per VOICE.md.
 """
 
 from __future__ import annotations
@@ -26,6 +29,19 @@ log = logging.getLogger(__name__)
 
 _PROMPT_FILE = "matcher.txt"
 TRACKER = "tracker"
+
+# Archetypes the orchestrator can actually build apps for. Expand as new
+# chassis + prompt template pairs are added (see archetypes/ and
+# prompts/generator/). Bundle F: tracker + chatbot + utility_tool +
+# search_directory. Future bundles add ai_generator, ai_agent, game,
+# marketplace, map_visualizer, glorified_todo, glorified_social,
+# recommendation_engine, parody_ui.
+_V0_BUILDABLE: frozenset[str] = frozenset({
+    "tracker",
+    "chatbot",
+    "utility_tool",
+    "search_directory",
+})
 
 
 def _load_prompt() -> str:
@@ -60,7 +76,7 @@ def _call(input_text: str, *, app_id: str | None) -> str:
 
 
 def score(input_text: str, *, app_id: str | None = None) -> MatcherResult | None:
-    """Score against 12 archetypes. Returns None if both attempts fail to parse."""
+    """Score against the 13 archetypes (Bundle F). Returns None if both attempts fail to parse."""
     text = _call(input_text, app_id=app_id)
     try:
         return MatcherResult.model_validate(_extract_json(text))
@@ -88,5 +104,10 @@ def pick(result: MatcherResult) -> str | None:
 
 
 def is_v0_buildable(picked: str | None) -> bool:
-    """V0 ships only Tracker apps."""
-    return picked == TRACKER
+    """Whether the orchestrator can ship an app for this archetype.
+
+    Bundle F: tracker, chatbot, utility_tool, search_directory. Other
+    archetypes from the 13 score in the matcher (for calibration and the
+    "dice rolled wrong" satirical content) but route to rejection.
+    """
+    return picked in _V0_BUILDABLE

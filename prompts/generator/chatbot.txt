@@ -1,0 +1,140 @@
+You are generating a Next.js 14 (App Router) project for a small
+chatbot app. The Chatbot archetype is a conversational UI for a
+specific domain — chat bubbles, message input, single context. The
+user types messages; an AI replies. The whole interaction lives in
+one focused chat view.
+
+VISUAL TREATMENT:
+Lead with a focused header — title, optional avatar/logo, brief
+subtitle describing the bot's purpose (e.g. "Your study buddy for
+CS classes" / "Get advice on plant care" / "Practice mock interviews").
+The body is a scrollable message list with chat bubbles: user
+messages right-aligned (often with an accent background), assistant
+messages left-aligned (often with a soft/neutral background and
+optional bot avatar). At the bottom, a fixed input bar with a text
+field and a send button (Enter to send is standard). Typing
+indicators while waiting for a reply. Minimal chrome around the
+chat — the conversation IS the page.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom of
+this prompt, treat those snippets as factual foundation for the bot's
+domain knowledge (you can pre-load a small starter message or
+contextualize the system prompt). The named-attribution constraint
+applies regardless of whether sources are present.
+
+A layout wrapper provides the page chrome (an html/body shell, a
+footer, and the Tailwind directives). You DO NOT produce layout.tsx,
+globals.css, package.json, tsconfig.json, tailwind.config.ts, or any
+other chassis file — those are owned by the project scaffold and any
+attempt to write them will be silently dropped.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "lib/data.ts", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES:
+- Every path must start with "app/" or "lib/".
+- Every path must end with ".ts", ".tsx", or ".css".
+- No absolute paths. No "..". No backslashes.
+- "app/page.tsx" is REQUIRED — it is the entry point.
+- Components live under "lib/components/<Name>.tsx".
+- Helpers under "lib/utils.ts" or "lib/<topic>.ts".
+- Custom CSS under "app/styles.css" or "lib/<name>.css".
+
+AI INFERENCE PATTERN:
+
+You need to actually wire up AI inference for the bot's responses.
+Use ONE of these no-key, no-signup paths — pick whichever you prefer:
+
+(A) **Puter.js** — simplest. One script tag and one method call:
+```tsx
+// In page.tsx, "use client":
+useEffect(() => {
+  const script = document.createElement("script");
+  script.src = "https://js.puter.com/v2/";
+  script.onload = () => setReady(true);
+  document.body.appendChild(script);
+}, []);
+
+// Send a message:
+const reply = await (window as any).puter.ai.chat(userMessage);
+```
+
+(B) **LLM7.io** — OpenAI-compatible, no token, just fetch:
+```tsx
+const res = await fetch("https://api.llm7.io/v1/chat/completions", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: "gpt-3.5-turbo",
+    messages: [
+      { role: "system", content: "You are a..." },
+      ...history,
+      { role: "user", content: userMessage },
+    ],
+  }),
+});
+const data = await res.json();
+const reply = data.choices?.[0]?.message?.content;
+```
+
+Both go down occasionally, rate-limit you, or return weird outputs.
+That is on-brand for the genre — flaky AI responses are exactly what
+real hackathon chatbots do. Catch errors and show a generic "Sorry,
+something went wrong. Try again." message. Do NOT build elaborate
+retry logic or fallback chains.
+
+Within CHATBOT, you have creative freedom over palette (often a
+single tinted accent for the brand), avatar styling (emoji is fine,
+inline SVG is fine), bubble shape (rounded squares, full pills,
+speech-bubble tails), typing indicator style (animated dots, "Bot is
+typing..." text), and overall density. Use any data shape you want
+for message history.
+
+Constraints (the only hard rules):
+- Use the App Router. Add "use client" to page.tsx — chat state lives
+  in React.
+- Tailwind utility classes are your default styling tool. Inline
+  style={{}} and custom CSS files are fine.
+- All static data (system prompt, starter messages, domain knowledge)
+  is hardcoded in lib/data.ts and imported into page.tsx. Runtime
+  fetch() to AI APIs is the WHOLE POINT of this archetype.
+- Do NOT include a footer in page.tsx — the chassis layout renders one.
+- The app must build cleanly with `next build`.
+- If you import from another file you produced, MAKE SURE that file
+  is in your output. Missing imports break the build.
+- When the bot's persona or starter messages reference quotes,
+  statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Use generic role references: "a study group", "a previous user",
+    "an expert"
+  - Do NOT fabricate institutional names that could be confused with
+    real-sounding agencies
+
+Interactivity for CHATBOT:
+**This archetype IS interactivity.** The chat loop (type → send →
+wait → render reply) must work. Required: message list updates as
+new messages arrive, input clears on send, typing indicator while
+the AI call is in-flight. Add at least one of: clear-chat button,
+suggested-prompt chips above the input, dark/light toggle, scroll-to-
+bottom auto-behavior, message-copy button, regenerate-last-reply.
+
+Use React state (useState / useReducer) for the message history. If
+the API call times out, the typing indicator stalling forever is
+on-brand for the genre — don't over-engineer the failure path.
+
+Output the JSON object only. No prose before or after.

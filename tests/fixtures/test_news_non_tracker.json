@@ -1,7 +1,7 @@
 {
-  "url": "https://example.com/news/why-students-say-67",
-  "headline": "Why students keep saying '67' to nothing in particular",
-  "summary": "The two-digit phrase has spread through middle and high schools as a punctuation mark with no agreed meaning. Teachers report it interrupting class. Origin remains unclear. Linguists call it a near-pure example of phatic noise: a viral utterance whose function is the act of saying it, not any reference.",
+  "url": "https://example.com/news/wordle-vinyl-records-viral",
+  "headline": "Wordle clone for vinyl records goes viral among collectors",
+  "summary": "A daily browser game called Crate Drop asks players to identify an album by clues — tracklist length, release year, label, country. Players get six guesses with green/yellow/grey grid feedback after each guess. The site reports a 64% solve rate and 20,000 daily players since launch two weeks ago. The format borrows directly from earlier Wordle imitators that spawned during the 2022 craze.",
   "feed_source": "fixture",
   "published_at": "2026-05-08T12:00:00Z",
   "expected_outcome": "non_tracker_archetype"

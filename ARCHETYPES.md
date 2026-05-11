@@ -1,12 +1,16 @@
 # Archetypes
 
-Vibe Mill produces apps that fit one of twelve archetypes. The matcher's job is to score each input against all twelve and either pick the highest scorer (if above threshold 7) or reject. The generator's job is to produce code that fits the chosen archetype.
+> **Bundle F revised the archetype taxonomy** from 12 content-mixed entries to **13 form-rooted archetypes** (see commit message for the rationale). This document below still describes the original 12 in detail; the canonical current list lives in `prompts/matcher.txt` and `MATCHER.md`. A full rewrite of this doc against the new 13 is a follow-up task.
+>
+> **Current 13** (Bundle F): `tracker`, `ai_agent`, `chatbot`, `ai_generator`, `game`, `glorified_todo`, `glorified_social`, `recommendation_engine`, `marketplace`, `map_visualizer`, `utility_tool`, `search_directory`, `parody_ui`. **Buildable subset** (the orchestrator can ship apps for these): `tracker`, `chatbot`, `utility_tool`, `search_directory`. Other archetypes score in the matcher but route to "archetype not yet implemented" rejection — they widen the buildable set in future bundles.
 
-This document describes each archetype at the conceptual level. Implementation details (slot structure, codegen prompt fragments) are derived from this document by `MATCHER.md` and `GENERATOR.md`.
+Vibe Mill produces apps that fit one of the configured archetypes. The matcher's job is to score each input against all archetypes and either pick the highest scorer (if above threshold 7) or reject. The generator's job is to produce code that fits the chosen archetype.
 
-## V0 scope
+This document describes each archetype at the conceptual level. Implementation details (chassis structure, codegen prompt fragments) are derived from this document by `MATCHER.md` and `GENERATOR.md`.
 
-V0 implements only **Tracker**. The other 11 archetypes are stubbed in code but the matcher should never select them (they will always score 0 in V0). The full archetype library is enabled in V1.
+## V0 scope (HISTORICAL — pre-Bundle-F)
+
+V0 originally implemented only **Tracker**. Bundle F expanded the buildable set incrementally; the original "only Tracker ships" framing is preserved below for reference but no longer reflects current behavior.
 
 ## How archetypes constrain (and don't)
 

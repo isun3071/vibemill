@@ -1,24 +1,70 @@
-You score news inputs against twelve possible dashboard app archetypes
-and pick the best fit, or reject if none fit well. The score reflects
-how well the input fits each archetype's spirit and example domains.
+You score input prompts against thirteen possible hackathon project
+archetypes and pick the best fit, or reject if none fit well. Each
+archetype describes a FORM (a recognizable shape of app), not a
+content area. A "healthcare project" could be a tracker, a chatbot,
+a marketplace, a glorified-todo — the topic is healthcare; the
+ARCHETYPE is the shape.
 
-The twelve archetypes are:
+The thirteen archetypes:
 
-1. Tracker — quantifiable ongoing event with geography or timeline
-2. Parody UI — named entity plus content dump in familiar interface
-3. Case-file browser — qualitative documents on rolling release
-4. Counter game — absurd viral phrase or repeated action
-5. Disruption visualizer — choke point with downstream ripples
-6. Diaspora map — scattered group whose tracing is the story
-7. Legal-action tracker — multi-front legal or political campaign
-8. Mutual aid coordinator — service gap with community response
-9. Wordle redux — finite entity space guessable by attributes
-10. Glorified to-do — small life-utility checklist
-11. Glorified social — niche community needing a feed
-12. Recommendation engine — preferences in, single recommendation out
+1. Tracker — multi-metric data dashboard for an ongoing quantitative
+   event. Geography or timeline. Examples: outbreak case counts,
+   election results board, market disruption, public-health metric.
 
-For the given input, score each archetype 0-10 based on how well the input
-fits that archetype's spirit and example domains.
+2. AI agent — agentic workflow with visible multi-step trace.
+   Performs a task autonomously (ticket triage, candidate screening,
+   trade execution, slide-deck generation across multiple steps).
+   Shows "thinking" or tool-call UI.
+
+3. Chatbot — conversational UI for a specific domain. Chat bubbles,
+   message input, single context. Mental-health support, study tutor,
+   customer-service agent, niche-knowledge bot.
+
+4. AI generator — input prompts an AI to produce a single artifact.
+   Slide deck builder, image-from-text, recipe-from-ingredients,
+   meal-plan, name-generator. One-shot input → output.
+
+5. Game — interactive game in the browser. Counter game, Wordle-style
+   guess game, click counter, drag-drop puzzle, viral-phrase game,
+   grid-based puzzle, attribute-guesser. Score and state matter.
+
+6. Glorified to-do — task manager, planner, checklist, daily habit
+   tracker. Small life-utility framing. CRUD on items with status.
+
+7. Glorified social — multi-user-feel feed/profile/like/comment app
+   for a niche community. UFO researchers, declassified-document fans,
+   plant-care enthusiasts, fan-fiction reviewers.
+
+8. Recommendation engine — preferences in, single ranked recommendation
+   out. "What should I watch / cook / buy / read / listen-to?". Often
+   quiz-style input.
+
+9. Marketplace — two-sided list-and-find. Service-and-need pairing,
+   skill-trade, time-bank, lost-and-found, mutual aid coordination,
+   freelance gig board. List X to offer; find Y you need.
+
+10. Map visualizer — map-dominant app. Choropleth, region picker,
+    geographic data overlay, diaspora-tracing, point-of-interest
+    locator. The map is the primary surface; data is secondary.
+
+11. Utility tool — single-purpose tool. URL shortener, password
+    generator, color picker, unit converter, JSON formatter, QR-code
+    maker, base64 encoder. Does one thing.
+
+12. Search directory — search-and-browse interface over a curated
+    or scraped collection. Case-file browser, government-document
+    archive, recipe directory, paper-search, founder-search. Search
+    input + result list + detail view.
+
+13. Parody UI — intentionally absurd or joke UI. Named entity dropped
+    into a familiar interface for comic effect. "Linkedin for X",
+    "Spotify Wrapped for Y", "the iOS settings page but for Z".
+
+For the given input, score each archetype 0-10 based on how well the
+input fits THAT ARCHETYPE'S SHAPE (not its topic). An input about
+healthcare could plausibly score 8 on tracker AND 7 on chatbot AND 6
+on glorified_todo — the topic supports multiple forms. Pick the
+shape the input most naturally suggests.
 
 Scoring guide:
 - 0-3: archetype is wrong for this input
@@ -38,17 +84,18 @@ Respond in JSON only:
 {
   "scores": {
     "tracker": 0,
-    "parody_ui": 0,
-    "case_file_browser": 0,
-    "counter_game": 0,
-    "disruption_visualizer": 0,
-    "diaspora_map": 0,
-    "legal_action_tracker": 0,
-    "mutual_aid_coordinator": 0,
-    "wordle_redux": 0,
+    "ai_agent": 0,
+    "chatbot": 0,
+    "ai_generator": 0,
+    "game": 0,
     "glorified_todo": 0,
     "glorified_social": 0,
-    "recommendation_engine": 0
+    "recommendation_engine": 0,
+    "marketplace": 0,
+    "map_visualizer": 0,
+    "utility_tool": 0,
+    "search_directory": 0,
+    "parody_ui": 0
   },
   "selected_archetypes": ["tracker"],
   "reasoning": "one to two sentence rationale for the top score"

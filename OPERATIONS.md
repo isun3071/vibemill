@@ -207,7 +207,7 @@ Supersedes the v0.5 committed-path workflow. Per generation, the orchestrator ro
 |---|---|---|---|
 | `slop` | 10% | No web search. Reasoning disabled. 1 build retry (2 attempts). Hardcoded fabricated data. Vibecoder running on fumes at 3am. | ~$0.05/app |
 | `mean_good` | 82% | Web search (up to 4 queries via Tavily). Reasoning at LOW. 2 build retries (3 attempts). Real-data foundation, fabricated decoration. Sub-prize-winning hackathon team — polished in one dimension. | ~$0.40/app |
-| `banger` | 8% | Web search (up to 6 queries). Reasoning at MEDIUM. 3 build retries (4 attempts). Real data primary, minimal fabrication. Best-overall committed-QA cohort. Sets `apps.committed_path = true` for backwards compatibility. | ~$0.70/app |
+| `banger` | 8% | Web search (up to 6 queries). Reasoning at MEDIUM. 3 build retries (4 attempts). Real data primary, minimal fabrication. **Best-overall hackathon team — MVP-form output, polished across multiple dimensions, demoable end-to-end.** Vibe Mill's industrialized-MVPs surface (THESIS.md Pillar 2). Sets `apps.committed_path = true` for backwards compatibility. | ~$0.70/app |
 
 The dice roll is **independent of input score, archetype, or any other signal** — purely random sampling. Per ANTI_PATTERNS rule 5 v5, this samples the producer-population's distribution of effort faithfully rather than routing on quality. Bundle E recalibrated mean_good upward from "median junior portfolio" to "sub-prize winner"; cost rose from ~$0.30 to ~$0.40 per app.
 
