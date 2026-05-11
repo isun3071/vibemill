@@ -101,8 +101,8 @@ def generate(track: TrackChoice) -> NewsItem:
     """
     user_prompt = _load_prompt().replace("{{track_context}}", _track_context(track))
     log.info(
-        "==> SYNTHETIC PROMPT (track=%s/%s, %d chars):\n%s\n<== END SYNTHETIC PROMPT",
-        track.group, track.slug or "-", len(user_prompt), user_prompt,
+        "synthetic prompt: track=%s/%s chars=%d",
+        track.group, track.slug or "-", len(user_prompt),
     )
 
     for attempt in (1, 2):

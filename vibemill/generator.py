@@ -294,9 +294,9 @@ def generate(
         )
 
     log.info(
-        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, layout=%s, tier=%s, blend=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
+        "generator prompt: model=%s reasoning=%s archetype=%s layout=%s tier=%s blend=%s chars=%d",
         model.slug, model.reasoning_effort, archetype, layout, tier, blend_partner,
-        len(user_prompt), user_prompt,
+        len(user_prompt),
     )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:

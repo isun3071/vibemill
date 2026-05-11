@@ -120,8 +120,8 @@ def write(
         source_headline=source_headline,
     )
     log.info(
-        "==> README PROMPT (model=%s, persona=%s, app_name=%s, %d chars):\n%s\n<== END README PROMPT",
-        model.slug, persona, app_name, len(user_prompt), user_prompt,
+        "readme prompt: model=%s persona=%s app_name=%s chars=%d",
+        model.slug, persona, app_name, len(user_prompt),
     )
     completion = openrouter.complete(
         model=model.slug,
