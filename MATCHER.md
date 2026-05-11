@@ -83,6 +83,21 @@ The archetypes describe FORM, not content. A "healthcare" input could plausibly 
 
 If `selected_archetypes` contains more than one archetype, the orchestrator picks one uniformly at random. The full `scores` object is stored in `rejections.all_scores` (even when the input passes) for transparency and for the rejection sidebar to display occasional "the dice rolled" entries.
 
+### Blend logic (Bundle G)
+
+After `pick()` chooses the primary archetype, `pick_blend()` may roll a secondary that gets blended into the same app.
+
+Rules in `matcher.py`:
+
+- `SCORE_THRESHOLD = 7` — both archetypes must score at or above
+- `BLEND_DELTA = 1` — top-2 scores must be within 1 point of each other
+- Both archetypes must be in `_V0_BUILDABLE` (otherwise the secondary couldn't be incorporated)
+- `BLEND_PROBABILITY = 0.30` — 30% chance of firing when the eligibility conditions hold
+
+When a blend fires, the orchestrator passes `blend_partner=<secondary>` to `generator.generate()`. The generator prepends a "BLEND CONTEXT" preamble to the prompt naming the secondary archetype and asking the LLM to weave it in as a sub-feature; the primary's structure dominates. Stored on `apps.blend_partner_archetype` for the corpus.
+
+Effective blend rate: roughly 15% of apps overall (depends on how often the matcher produces tied-near-top buildable pairs). Most apps remain single-archetype.
+
 ### Incremental archetype rollout
 
 The matcher prompt always scores all 13 archetypes (for calibration data and to feed the "dice rolled wrong" satirical content). The orchestrator only ships apps for the **buildable subset**, defined in `matcher.py:_V0_BUILDABLE`.

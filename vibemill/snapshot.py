@@ -77,6 +77,7 @@ def push() -> SnapshotCounts:
     supabase.assert_tier_columns()  # confirms migration 006 on remote
     supabase.assert_file_count_column()  # confirms migration 007 on remote
     supabase.assert_layout_archetype_column()  # confirms migration 008 on remote
+    supabase.assert_synthetic_blend_columns()  # confirms migration 009 on remote
 
     con = _connect()
     try:

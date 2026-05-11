@@ -45,10 +45,14 @@ vibemill/
 ├── config.py                     # loads .env, exposes typed config
 ├── models.py                     # pydantic models for inter-module data
 │
-├── ingest.py                     # AP + BBC RSS pull
+├── ingest.py                     # AP/BBC/Reuters/Al Jazeera/Wired RSS pull (40% pipeline)
+├── synthetic_prompt.py           # Bundle G: synthetic hackathon-idea LLM (60% pipeline, Haiku)
+├── tracks.py                     # Bundle G: hackathon-track taxonomy + sampler
+├── tiers.py                      # three-tier output calibration (slop/mean_good/banger)
+├── layouts.py                    # Bundle C: Tracker layout-archetype rotation
 ├── guard.py                      # guard model wrapper (claude haiku)
-├── matcher.py                    # archetype matcher (claude haiku)
-├── generator.py                  # codegen (deepseek-v3)
+├── matcher.py                    # archetype matcher + blend logic (claude haiku)
+├── generator.py                  # codegen (deepseek-v4-flash)
 ├── readme_writer.py              # vibecoder-persona README generator
 ├── github_publish.py             # github org repo create + push
 ├── vercel_deploy.py              # vercel project create + deploy
@@ -121,6 +125,7 @@ Versioned prompt files. Each is plain text with `{{variable}}` placeholders.
 prompts/
 ├── guard.txt                     # safety check prompt (haiku)
 ├── matcher.txt                   # 13-archetype scoring prompt (haiku, Bundle F)
+├── synthetic_prompt.txt          # Bundle G: hackathon-idea generation (haiku, conditioned on track)
 ├── readme/                       # 12 README personas (Bundle E: +5 from 7)
 │   ├── enthusiastic.txt
 │   ├── minimalist.txt

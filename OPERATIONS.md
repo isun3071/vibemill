@@ -167,6 +167,51 @@ Stillborn apps appear in the cemetery with status `stillborn` and a special tomb
 
 These are not hidden. They are part of the artifact: even an industrial app machine has a stillbirth rate. Showing it preserves the operation's honesty.
 
+## Input pipeline: 40/60 news + synthetic (Bundle G)
+
+Per app slot, the orchestrator rolls a source: **40% news pipeline**, **60% synthetic-prompt pipeline**. If news is rolled but the RSS queue is empty, falls through to synthetic. Per-tick attempts cap at `MAX_ATTEMPTS_PER_TICK = 20` (= `MAX_APPS_PER_TICK × 4`); the tick stops once `MAX_APPS_PER_TICK = 5` ships are achieved or attempts are exhausted.
+
+### Why hybrid
+
+News inputs (RSS from AP / BBC / Reuters / Al Jazeera / Wired) are *structurally* tracker-shaped — they describe quantitative ongoing events with timelines and geography. Run on news only, the mill produces almost exclusively trackers. The 60% synthetic pipeline broadens the corpus to the full hackathon archetype range. Both are genre-faithful: a real American college hackathon team builds either *from a news event* (a public-health tracker, an election board) or *from a tossed-around idea over coffee at 11pm* (a chatbot, a niche directory, a fake AI tool). Sampling across both modes mirrors the producer population's actual ideation surface.
+
+### Synthetic prompt generation
+
+`vibemill/synthetic_prompt.py` calls **Claude Haiku 4.5** to generate one hackathon-style project idea per slot. Cost: ~$0.0005 per ideation. Why Haiku over DeepSeek for this stage: Claude is more trained on American hackathon culture (HackHarvard / HackMIT / TreeHacks / PennApps), which matches the target cohort. The output is a `NewsItem`-shaped object so the downstream pipeline (guard → matcher → generator) operates identically on news and synthetic inputs.
+
+### Tracks (Bundle G)
+
+`vibemill/tracks.py` defines the track taxonomy. Hierarchical sampling:
+
+1. Roll a **group** from `TRACK_GROUP_WEIGHTS`:
+
+   | Group              | Weight | Examples |
+   |--------------------|-------:|----------|
+   | `free_for_all`     | 30%    | No track constraint; "Best Overall" lane |
+   | `cause_based`      | 30%    | Healthcare, Sustainability, Education, Accessibility, Civic Tech, Trust & Security, Mental Health |
+   | `tech_frontier`    | 25%    | AI/LLM, Edge AI, Fintech & Web3, Autonomy, AR/VR, Systems & Infra, Dev Tools |
+   | `cultural_creative`| 8%     | Entertainment & Games, Culture, Creative Tooling, Music |
+   | `sponsor_vendor`   | 7%     | Best Use of Anthropic / MongoDB / Vercel / Cerebras / etc., Best Quant Finance |
+
+2. If group ≠ `free_for_all`, roll a named track within the group uniformly. Sources: HackHarvard 2025, HackMIT 2025, TreeHacks 2026, PennApps XXV (see web-search done for Bundle G).
+
+3. The track group + slug get persisted on `apps.synthetic_track` as `"{group}:{slug}"`.
+
+Tracks change yearly. The `NAMED_TRACKS` dict in `tracks.py` reflects the 2025-2026 season; refresh annually.
+
+### Matcher blend (Bundle G)
+
+After the matcher scores all 13 archetypes and `pick()` selects the primary, `pick_blend()` may roll a secondary. Rules:
+
+- Top-2 scores must both be ≥ threshold (7)
+- The two scores must be within `BLEND_DELTA = 1` of each other
+- Both archetypes must be in the buildable set
+- Roll: `BLEND_PROBABILITY = 0.30` chance of returning the secondary
+
+When a blend fires, the generator prompt gets a "BLEND CONTEXT" preamble naming the secondary archetype. The LLM is asked to weave the secondary form in as a sub-feature; the primary's structure dominates. Examples: chatbot + recommendation_engine (a chatbot that recommends things), tracker + chatbot (a dashboard with an inline AI chat panel), search_directory + utility_tool (a search interface with a per-item tool).
+
+Rationale: real hackathon projects often blend forms naturally. Forcing single-archetype output is structurally less faithful than allowing occasional blends. The 15% effective blend rate (30% conditional × ~50% top-2 closeness) preserves single-archetype as the modal output while sampling natural blends.
+
 ## Generator substrate
 
 Bundle E (May 2026) abandoned substrate rotation. The corpus runs on a single substrate: **DeepSeek V4 Flash** (`deepseek/deepseek-v4-flash`). Configured via `GENERATOR_MODEL` in `.env`. The README writer uses the same substrate; voice variance comes entirely from README persona rotation (12 personas in `readme_writer.py`).

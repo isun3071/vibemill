@@ -29,6 +29,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import random as _random
+
 from . import (
     audit,
     db,
@@ -45,7 +47,9 @@ from . import (
     screenshot,
     security,
     snapshot,
+    synthetic_prompt,
     tiers,
+    tracks,
     vercel_deploy,
     verify,
     web_search,
@@ -68,6 +72,17 @@ log = logging.getLogger(__name__)
 # from ~0.4 to ~1.7 apps. Cap at 5 to give one tick room to clear a backlog
 # while still bounding worst-case cost spike.
 MAX_APPS_PER_TICK = 5
+# Bundle G: with rejections common (~70% from Bundle F empirical data),
+# allow more attempts per tick to reach MAX_APPS_PER_TICK ships. Caps
+# runaway-rejection cost — at ~$0.003 per rejected attempt, MAX_ATTEMPTS
+# = 20 caps wasted spend at ~$0.06/tick.
+MAX_ATTEMPTS_PER_TICK = MAX_APPS_PER_TICK * 4
+
+# Bundle G: 40% news pipeline, 60% synthetic prompt pipeline.
+# Per app slot, an independent roll decides the source. If news is rolled
+# but the news queue is empty, falls back to synthetic.
+NEWS_SOURCE_RATIO = 0.40
+
 NEXT_BUILD_TIMEOUT_S = 240
 
 
@@ -137,15 +152,22 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
 # ============================================================================
 
 
-def _ship_one(item: NewsItem) -> str:
-    """Process one news item all the way to a live Vercel URL or a logged
-    rejection / stillborn marker. Returns one of:
+def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
+    """Process one input item (news or synthetic) all the way to a live
+    Vercel URL or a logged rejection / stillborn marker.
+
+    `synthetic_track` (Bundle G): set to "{group}:{slug}" when this input
+    came from the synthetic-prompt pipeline; None for news. Used for
+    AppRecord storage and to derive source kind.
+
+    Returns one of:
         'shipped' | 'rejected_guard' | 'rejected_matcher' | 'rejected_archetype'
         | 'stillborn_build' | 'stillborn_publish' | 'stillborn_deploy'
         | 'stillborn_forbidden' | 'screenshot_missing'  (last is still shipped)
     """
     settings = get_settings()
     prompt = f"{item.headline}. {item.summary}".strip()
+    source_kind: str = "synthetic" if synthetic_track is not None else "news"
 
     # 1. Guard
     g = guard.check(prompt)
@@ -175,7 +197,7 @@ def _ship_one(item: NewsItem) -> str:
     m = matcher.score(prompt)
     if m is None:
         db.insert_rejection(
-            source="news", prompt=prompt, rejection_stage="matcher",
+            source=source_kind, prompt=prompt, rejection_stage="matcher",
             rejection_reason="matcher_error",
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
         )
@@ -187,7 +209,7 @@ def _ship_one(item: NewsItem) -> str:
     best_archetype, best_score = m.scores.best()
     if picked is None:
         db.insert_rejection(
-            source="news", prompt=prompt, rejection_stage="matcher",
+            source=source_kind, prompt=prompt, rejection_stage="matcher",
             rejection_reason="no archetype match",
             best_archetype=best_archetype, best_score=best_score,
             all_scores=m.scores.as_dict(),
@@ -201,7 +223,7 @@ def _ship_one(item: NewsItem) -> str:
 
     if not matcher.is_v0_buildable(picked):
         db.insert_rejection(
-            source="news", prompt=prompt, rejection_stage="matcher",
+            source=source_kind, prompt=prompt, rejection_stage="matcher",
             rejection_reason=f"archetype not yet implemented: {picked}",
             best_archetype=picked, best_score=m.scores.as_dict()[picked],
             all_scores=m.scores.as_dict(),
@@ -215,6 +237,15 @@ def _ship_one(item: NewsItem) -> str:
 
     # We have a buildable archetype. Mint an id; persist it on the row at the end.
     archetype = picked
+
+    # Bundle G: maybe roll a blend partner. Returns None most of the time;
+    # when set, the generator will weave a secondary archetype's form into
+    # the primary as a sub-feature.
+    blend_partner = matcher.pick_blend(m, archetype)
+    if blend_partner:
+        log.info("%s: blend rolled: primary=%s + secondary=%s",
+                 archetype, archetype, blend_partner)
+
     app_id = name_generator.make_name(
         archetype=archetype,
         source_headline=item.headline,
@@ -262,8 +293,11 @@ def _ship_one(item: NewsItem) -> str:
     max_build_attempts = tier_cfg.build_attempts
 
     log.info(
-        "==> SHIPPING %s [TIER=%s LAYOUT=%s] | archetype=%s score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
-        app_id, tier.upper(), (layout or "-").upper(), archetype, m.scores.as_dict()[archetype],
+        "==> SHIPPING %s [TIER=%s LAYOUT=%s SOURCE=%s%s] | archetype=%s%s score=%d | generator=%s reasoning=%s | search_results=%d retries=%d | headline=%r",
+        app_id, tier.upper(), (layout or "-").upper(), source_kind.upper(),
+        f"/{synthetic_track}" if synthetic_track else "",
+        archetype, f"+{blend_partner}" if blend_partner else "",
+        m.scores.as_dict()[archetype],
         gen_model.slug, gen_model.reasoning_effort,
         len(search_outcome.results), max_build_attempts - 1, item.headline[:120],
     )
@@ -295,6 +329,7 @@ def _ship_one(item: NewsItem) -> str:
                 extra_context=web_search.format_for_prompt(search_outcome) or None,
                 tier=tier,
                 layout=layout,
+                blend_partner=blend_partner,
                 model=gen_model,
                 app_id=app_id,
             )
@@ -346,7 +381,7 @@ def _ship_one(item: NewsItem) -> str:
             id=app_id, prompt=prompt, archetype=archetype,
             archetype_score=m.scores.as_dict()[archetype],
             tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
-            source="news",
+            source=source_kind,
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             status="stillborn", death_cause="forbidden_pattern",
             generation_seconds=elapsed,
@@ -362,6 +397,8 @@ def _ship_one(item: NewsItem) -> str:
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
             layout_archetype=layout,
+            synthetic_track=synthetic_track,
+            blend_partner_archetype=blend_partner,
         ))
         audit.event(
             audit.ORCHESTRATOR, "app.stillborn", target=app_id,
@@ -381,7 +418,7 @@ def _ship_one(item: NewsItem) -> str:
             id=app_id, prompt=prompt, archetype=archetype,
             archetype_score=m.scores.as_dict()[archetype],
             tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
-            source="news",
+            source=source_kind,
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             status="stillborn", death_cause="never_built",
             generation_seconds=elapsed,
@@ -397,6 +434,8 @@ def _ship_one(item: NewsItem) -> str:
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
             layout_archetype=layout,
+            synthetic_track=synthetic_track,
+            blend_partner_archetype=blend_partner,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason="never_built (build failure after retry)")
         db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
@@ -419,7 +458,7 @@ def _ship_one(item: NewsItem) -> str:
         log.error("%s: github publish failed: %s", app_id, exc)
         db.insert_app(AppRecord(
             id=app_id, prompt=prompt, archetype=archetype,
-            archetype_score=m.scores.as_dict()[archetype], source="news",
+            archetype_score=m.scores.as_dict()[archetype], source=source_kind,
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
@@ -433,6 +472,8 @@ def _ship_one(item: NewsItem) -> str:
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
             layout_archetype=layout,
+            synthetic_track=synthetic_track,
+            blend_partner_archetype=blend_partner,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"github publish failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -459,7 +500,7 @@ def _ship_one(item: NewsItem) -> str:
             log.warning("%s: github archive after vercel failure also failed: %s", app_id, exc2)
         db.insert_app(AppRecord(
             id=app_id, prompt=prompt, archetype=archetype,
-            archetype_score=m.scores.as_dict()[archetype], source="news",
+            archetype_score=m.scores.as_dict()[archetype], source=source_kind,
             source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
             github_url=publish_result.html_url,
             status="stillborn", death_cause="never_built",
@@ -474,6 +515,8 @@ def _ship_one(item: NewsItem) -> str:
             search_total_cost=search_outcome.cost_usd,
             file_count=(len(gen_out.files) if gen_out else None),
             layout_archetype=layout,
+            synthetic_track=synthetic_track,
+            blend_partner_archetype=blend_partner,
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -501,7 +544,7 @@ def _ship_one(item: NewsItem) -> str:
         screenshot_path=screenshot_path,
         screenshot_status=screenshot_status,
         generation_seconds=elapsed,
-        source="news",
+        source=source_kind,
         source_metadata={"url": item.url, "headline": item.headline, "feed": item.feed_source},
         status="live",
         verifier_verdict=verify_outcome.verdict,
@@ -516,13 +559,15 @@ def _ship_one(item: NewsItem) -> str:
         search_total_cost=search_outcome.cost_usd,
         file_count=len(gen_out.files),
         layout_archetype=layout,
+        synthetic_track=synthetic_track,
+        blend_partner_archetype=blend_partner,
     ))
     db.upsert_news_cache(url=item.url, headline=item.headline, feed_source=item.feed_source,
                          published_at=item.published_at, guard_status="passed",
                          matched_archetype=archetype, matcher_score=m.scores.as_dict()[archetype],
                          resulted_in_app=app_id)
     audit.event(audit.ORCHESTRATOR, "app.create", target=app_id,
-                reason=f"shipped from news (verdict={verify_outcome.verdict})")
+                reason=f"shipped from {source_kind} (verdict={verify_outcome.verdict})")
 
     shutil.rmtree(work, ignore_errors=True)
     log.info("%s: shipped -> %s", app_id, deploy_result.public_url)
@@ -546,23 +591,43 @@ def run_tick() -> TickResult:
         return TickResult(0, 0, 0, skipped_cost_cap=True)
     log.info("tick start: today_cost=$%.4f cap=$%.2f", spent, cap)
 
-    items = ingest.fetch_new_items()
-    if not items:
-        log.info("tick: no new items")
-        return TickResult(0, 0, 0, skipped_cost_cap=False)
+    # Bundle G: hybrid input. Fetch the news queue (40% of attempts pull
+    # from this), with the rest generated synthetically per slot.
+    news_queue = list(ingest.fetch_new_items())
+    log.info(
+        "tick: news_queue=%d items; rolling %d attempts at %.0f/%.0f news/synthetic split",
+        len(news_queue), MAX_ATTEMPTS_PER_TICK,
+        NEWS_SOURCE_RATIO * 100, (1 - NEWS_SOURCE_RATIO) * 100,
+    )
 
     shipped = 0
     rejections = 0
     stillborn = 0
-    for item in items:
-        if shipped >= MAX_APPS_PER_TICK:
-            log.info("tick: hit MAX_APPS_PER_TICK=%d, deferring rest to next tick", MAX_APPS_PER_TICK)
-            break
+    attempts = 0
+    while shipped < MAX_APPS_PER_TICK and attempts < MAX_ATTEMPTS_PER_TICK:
+        attempts += 1
+
+        # Per-slot 40/60 roll. If news rolled but queue is empty, fall
+        # through to synthetic.
+        use_news = (_random.random() < NEWS_SOURCE_RATIO) and bool(news_queue)
+        if use_news:
+            item = news_queue.pop(0)
+            synthetic_track: str | None = None
+        else:
+            track = tracks.pick_track()
+            try:
+                item = synthetic_prompt.generate(track)
+            except synthetic_prompt.SyntheticPromptError as exc:
+                log.warning("tick: synthetic generation failed; skipping slot: %s", exc)
+                continue
+            synthetic_track = f"{track.group}:{track.slug}" if track.slug else track.group
+
         try:
-            outcome = _ship_one(item)
+            outcome = _ship_one(item, synthetic_track=synthetic_track)
         except Exception as exc:
             log.exception("unexpected error processing %s: %s", item.url, exc)
             continue
+
         if outcome == "deferred_cap":
             # Pre-check inside _ship_one already logged the cap-reached
             # message and audit-logged it. Stop the tick cleanly.
@@ -580,6 +645,11 @@ def run_tick() -> TickResult:
             log.info("tick complete: daily cap reached at $%.4f mid-tick", db.today_cost_usd())
             audit.event(audit.ORCHESTRATOR, "tick.cap_reached", reason="post-app check")
             break
+
+    if shipped >= MAX_APPS_PER_TICK:
+        log.info("tick: hit MAX_APPS_PER_TICK=%d", MAX_APPS_PER_TICK)
+    elif attempts >= MAX_ATTEMPTS_PER_TICK:
+        log.info("tick: hit MAX_ATTEMPTS_PER_TICK=%d (shipped=%d)", MAX_ATTEMPTS_PER_TICK, shipped)
 
     try:
         snapshot.push()

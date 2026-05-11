@@ -201,6 +201,24 @@ def assert_layout_archetype_column() -> None:
     )
 
 
+def assert_synthetic_blend_columns() -> None:
+    """Verify migration 009 (synthetic_track + blend_partner_archetype) has
+    been applied to the Supabase apps table. Bundle G."""
+    url = (
+        f"{_base()}/rest/v1/apps"
+        "?select=synthetic_track,blend_partner_archetype&limit=0"
+    )
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 009 (synthetic_track + blend_partner_archetype) is missing "
+        f"on the Supabase apps table. HTTP {r.status_code}: {r.text[:200]}. "
+        "Apply migrations/supabase/009_add_synthetic_blend_columns.sql "
+        "manually in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

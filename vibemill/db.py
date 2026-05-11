@@ -94,6 +94,9 @@ class App(SQLModel, table=True):
     # Added by migration 008. Bundle C: layout-archetype rotation within Tracker.
     # See layouts.LAYOUT_WEIGHTS for the 8 possible values.
     layout_archetype: str | None = None
+    # Added by migration 009. Bundle G: synthetic-prompt pipeline + blend.
+    synthetic_track: str | None = None       # which hackathon track for synthetic-source apps
+    blend_partner_archetype: str | None = None  # secondary archetype if matcher blended
 
 
 class Rejection(SQLModel, table=True):
@@ -253,6 +256,8 @@ def insert_app(record: AppRecord) -> None:
         search_total_cost=record.search_total_cost,
         file_count=record.file_count,
         layout_archetype=record.layout_archetype,
+        synthetic_track=record.synthetic_track,
+        blend_partner_archetype=record.blend_partner_archetype,
     )
     with session() as s:
         s.add(row)

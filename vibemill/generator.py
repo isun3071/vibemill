@@ -223,6 +223,22 @@ def _parse(text: str) -> GeneratorOutput:
     return _validate_output(parsed)
 
 
+_BLEND_CONTEXT_TEMPLATE = (
+    "\n\nBLEND CONTEXT (Bundle G — 2-archetype blend):\n"
+    "The matcher rolled a blend: this app's PRIMARY archetype is "
+    "{primary}, but the secondary archetype {secondary} also scored at "
+    "or near the top. Weave a {secondary}-flavored sub-feature into the "
+    "primary {primary} app so that someone looking at the final artifact "
+    "could plausibly call it either form. Examples of natural blends: a "
+    "chatbot that also recommends things (chatbot + recommendation_engine), "
+    "a tracker with an inline AI chat panel (tracker + chatbot), a search "
+    "directory with a per-item utility tool (search_directory + "
+    "utility_tool). Pick a natural composition; don't force two whole "
+    "apps into one page. The primary's structure dominates; the secondary "
+    "appears as a section, panel, or sub-feature.\n"
+)
+
+
 def generate(
     *,
     archetype: str,
@@ -233,6 +249,7 @@ def generate(
     model: ModelChoice,
     tier: str | None = None,
     layout: str | None = None,
+    blend_partner: str | None = None,
     previous_build_error: str | None = None,
     extra_context: str | None = None,
     app_id: str | None = None,
@@ -240,13 +257,14 @@ def generate(
     """Run the generator. One retry on malformed JSON or invalid file set.
 
     `tier` selects the file-count guidance substituted into the prompt.
-    `layout` (Bundle C) selects which tracker layout template to load; for
-    archetype='tracker' it is required at the orchestrator layer (the tick
-    rolls one before calling this), but it's typed Optional so smoke tests
-    or scripts can omit it for non-tracker archetypes.
-    `previous_build_error`, if set, signals a build-failure retry: the prompt
-    is appended with the error and an instruction to fix it. Two malformed
-    failures in one call raise GeneratorJSONError.
+    `layout` (Bundle C) selects which tracker layout template to load.
+    `blend_partner` (Bundle G), if set, names a secondary archetype to
+    blend into the primary. Adds a BLEND CONTEXT preamble after the
+    main template render. The LLM is asked to weave the secondary form
+    in as a sub-feature; the primary's structure dominates.
+    `previous_build_error`, if set, signals a build-failure retry: the
+    prompt is appended with the error and an instruction to fix it. Two
+    malformed failures in one call raise GeneratorJSONError.
     """
     template = _load_template(archetype, layout=layout)
     user_prompt = _render(
@@ -257,6 +275,10 @@ def generate(
         source_summary=source_summary,
         file_count_guidance=_file_count_guidance(tier),
     )
+    if blend_partner:
+        user_prompt += _BLEND_CONTEXT_TEMPLATE.format(
+            primary=archetype, secondary=blend_partner,
+        )
     if extra_context:
         user_prompt += (
             "\n\nSource material from web search (use as factual foundation; "
@@ -272,8 +294,9 @@ def generate(
         )
 
     log.info(
-        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, layout=%s, tier=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
-        model.slug, model.reasoning_effort, archetype, layout, tier, len(user_prompt), user_prompt,
+        "==> GENERATOR PROMPT (model=%s reasoning=%s, archetype=%s, layout=%s, tier=%s, blend=%s, %d chars):\n%s\n<== END GENERATOR PROMPT",
+        model.slug, model.reasoning_effort, archetype, layout, tier, blend_partner,
+        len(user_prompt), user_prompt,
     )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:

@@ -59,12 +59,14 @@ ArchetypeName = Literal[
 ]
 
 GuardDecision = Literal["pass", "reject"]
-LlmPurpose = Literal["guard", "matcher", "generator", "readme", "name", "search"]
+LlmPurpose = Literal["guard", "matcher", "generator", "readme", "name", "search", "synthetic_prompt"]
 AppStatus = Literal["live", "archived", "stillborn", "viral"]
 DeathCause = Literal["rotation", "manual", "never_built"]
 RejectionStage = Literal["guard", "matcher"]
 ScreenshotStatus = Literal["pending", "captured", "missing"]
-SourceKind = Literal["news", "user_submitted"]
+# Bundle G: 'synthetic' is the 60% non-news pipeline (LLM-generated
+# hackathon ideas conditioned on a track). 'news' is the 40% RSS path.
+SourceKind = Literal["news", "user_submitted", "synthetic"]
 
 
 class NewsItem(BaseModel):
@@ -206,6 +208,12 @@ class AppRecord(BaseModel):
     file_count: int | None = None
     # Migration 008: Bundle C layout-archetype rotation within Tracker.
     layout_archetype: str | None = None
+    # Migration 009: Bundle G synthetic-prompt pipeline + matcher blend.
+    # synthetic_track: which hackathon track this app was generated from
+    # (None for news-source apps). blend_partner_archetype: the secondary
+    # archetype if the matcher rolled a blend (None for single-archetype apps).
+    synthetic_track: str | None = None
+    blend_partner_archetype: str | None = None
 
 
 class RejectionRecord(BaseModel):

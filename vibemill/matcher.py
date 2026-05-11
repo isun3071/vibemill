@@ -1,21 +1,30 @@
-"""Matcher: claude haiku scores all 13 archetypes; orchestrator picks one
-or rejects.
+"""Matcher: claude haiku scores all 13 archetypes; orchestrator picks
+one (or a blended pair) or rejects.
 
 Bundle F revised the taxonomy to 13 form-archetypes and incrementally
 expanded the buildable set. Currently buildable: tracker, chatbot,
 utility_tool, search_directory. The matcher still scores all 13 for
 calibration data; if the random pick lands on a not-yet-implemented
-archetype (ai_agent, ai_generator, game, marketplace, map_visualizer,
-glorified_todo, glorified_social, recommendation_engine, parody_ui),
-the input is rejected with reason 'archetype not yet implemented'.
-The dice rolling for an unbuildable archetype — including ties where
-a buildable lost the roll — is itself satirical content per VOICE.md.
+archetype, the input is rejected with reason 'archetype not yet
+implemented'. Dice rolling for an unbuildable archetype — including
+blend rolls where one side is unbuildable — is itself satirical
+content per VOICE.md.
+
+Bundle G adds blend logic: when the top-2 archetype scores are within
+1 point of each other AND both >= threshold AND both are in the
+buildable set, with probability BLEND_PROBABILITY we return a (primary,
+secondary) tuple. The generator gets a "BLEND CONTEXT" preamble for
+the secondary; the LLM weaves both forms into one app. Real hackathon
+projects often DO blend forms ("a chatbot that recommends restaurants"
+is chatbot + recommendation_engine), so this samples the producer-
+population's natural form-blending.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 import secrets
 
@@ -42,6 +51,15 @@ _V0_BUILDABLE: frozenset[str] = frozenset({
     "utility_tool",
     "search_directory",
 })
+
+# Bundle G: blend rules.
+# When top-2 scores are within BLEND_DELTA of each other AND both >=
+# threshold (7) AND both archetypes are buildable, with probability
+# BLEND_PROBABILITY the orchestrator generates a 2-archetype blend.
+# Otherwise it picks the primary alone.
+BLEND_DELTA = 1
+BLEND_PROBABILITY = 0.30
+SCORE_THRESHOLD = 7
 
 
 def _load_prompt() -> str:
@@ -101,6 +119,55 @@ def pick(result: MatcherResult) -> str | None:
     if len(result.selected_archetypes) == 1:
         return result.selected_archetypes[0]
     return result.selected_archetypes[secrets.randbelow(len(result.selected_archetypes))]
+
+
+def pick_blend(
+    result: MatcherResult,
+    primary: str,
+    *,
+    rng: random.Random | None = None,
+) -> str | None:
+    """Bundle G: maybe return a secondary archetype to blend with primary.
+
+    Returns:
+        - None if no blend (single-archetype generation)
+        - A buildable archetype slug != primary if a blend was rolled
+
+    Blend rules:
+    1. Top-2 scores in the matcher result must both be >= SCORE_THRESHOLD
+    2. The two scores must be within BLEND_DELTA of each other
+    3. Both archetypes must be in the buildable set (otherwise the
+       secondary couldn't actually be incorporated)
+    4. Roll: BLEND_PROBABILITY chance of returning the secondary,
+       otherwise None
+    """
+    if primary not in _V0_BUILDABLE:
+        return None
+    by_score = sorted(result.scores.as_dict().items(), key=lambda kv: -kv[1])
+    if len(by_score) < 2:
+        return None
+    (top_name, top_score), (second_name, second_score) = by_score[0], by_score[1]
+    # The primary might have been picked from a tied set; align "top" with it.
+    # If primary's score is below top, treat that pair as the candidate.
+    primary_score = result.scores.as_dict().get(primary, 0)
+    if primary_score < SCORE_THRESHOLD:
+        return None
+    # Find the highest-scoring buildable archetype that isn't primary.
+    for name, score in by_score:
+        if name == primary:
+            continue
+        if score < SCORE_THRESHOLD:
+            return None
+        if primary_score - score > BLEND_DELTA:
+            return None
+        if name not in _V0_BUILDABLE:
+            return None
+        # Eligible secondary found. Roll.
+        r = rng or random.Random()
+        if r.random() < BLEND_PROBABILITY:
+            return name
+        return None
+    return None
 
 
 def is_v0_buildable(picked: str | None) -> bool:

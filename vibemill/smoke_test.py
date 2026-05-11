@@ -4,6 +4,12 @@ Fixture-driven: each fixture in tests/fixtures/test_news*.json carries
 its own `expected_outcome`, and the test asserts that branch was taken
 without raising on the rejection paths.
 
+Bundle G's synthetic-prompt pipeline (the 60% non-news path) is NOT
+covered by smoke fixtures — synthetic prompts are LLM-generated per
+tick and non-reproducible. To exercise that path, run a live tick:
+`python -m vibemill`. The orchestrator rolls 40/60 news/synthetic and
+will exercise both paths.
+
 Outcomes the smoke test recognises:
 - happy_path: guard pass, tracker selected, build_ok=True
 - guard_reject: guard returns reject (short-circuits; no matcher call)

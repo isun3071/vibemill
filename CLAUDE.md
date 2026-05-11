@@ -41,11 +41,12 @@ This codebase contains design choices that *look* like bugs or code smells but a
 Implement only the following in v0:
 
 - **Orchestrator** at `/home/ian/vibemill/` on sunfamily, run every 4 hours via systemd timer (see `deploy/systemd/vibemill.timer`)
-- **News ingestion** from AP and BBC RSS feeds
+- **News ingestion** from AP, BBC, Reuters, Al Jazeera, Wired RSS feeds (40% of input slots — Bundle G)
+- **Synthetic prompt ingestion** (claude haiku) — hackathon-style ideas conditioned on real hackathon tracks (60% of input slots — Bundle G)
 - **Guard model pass** (claude haiku via OpenRouter, t=0) for content safety; rejects inherit LLM refusal
-- **Matcher** (claude haiku via OpenRouter, t=0) scoring against the **Tracker** archetype only; threshold 7
-- **Code generator** (DeepSeek V3 via OpenRouter, t=0.7) producing Tracker apps
-- **Verification pass** (DeepSeek V3 via OpenRouter, t=0.3, one-sentence prompt) — informational, not gating
+- **Matcher** (claude haiku via OpenRouter, t=0) scoring against the **13 archetypes** (Bundle F); threshold 7; blend logic at top-2 within delta=1
+- **Code generator** (DeepSeek V4 Flash via OpenRouter, t=0.7) producing apps across the buildable archetype set (Bundle F: tracker, chatbot, utility_tool, search_directory)
+- **Verification pass** (DeepSeek V4 Flash via OpenRouter, t=0.3, one-sentence prompt) — informational, not gating
 - **Static analysis** enforcing the safety patterns in `SECURITY.md` (`eval`, `child_process`, raw socket APIs, etc.)
 - **Readme writer** (claude haiku via OpenRouter) producing vibecoder-persona READMEs
 - **GitHub publisher** creating repos in the `vibemill-apps` org with fake commit history
