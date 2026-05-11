@@ -52,7 +52,7 @@ from . import (
 )
 from .clients import openrouter, supabase
 from .config import get_settings
-from .model_rotation import ModelChoice, ModelRotationError, Pool
+from .model_rotation import ModelChoice
 from .models import (
     AppRecord,
     GeneratorOutput,
@@ -137,69 +137,7 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
 # ============================================================================
 
 
-def _is_rate_limit_error(exc: BaseException) -> bool:
-    """Crude detection of OpenRouter rate-limit errors that escaped retry."""
-    msg = str(exc).lower()
-    return "429" in msg or "rate limit" in msg or "rate-limit" in msg
-
-
-def _generate_with_rate_limit_retry(
-    *,
-    pool: Pool,
-    chosen: ModelChoice,
-    archetype: str,
-    prompt: str,
-    item: NewsItem,
-    tier: str,
-    layout: str,
-    previous_build_error: str | None,
-    extra_context: str | None,
-    app_id: str,
-) -> tuple[GeneratorOutput, ModelChoice]:
-    """Run generator.generate(); on rate-limit error, re-roll the model
-    once excluding the failed slug and retry. Returns (output, model_used).
-    Re-raises any non-rate-limit error and any rate-limit error on the retry.
-    """
-    try:
-        out = generator.generate(
-            archetype=archetype,
-            prompt=prompt,
-            source_url=item.url,
-            source_headline=item.headline,
-            source_summary=item.summary,
-            previous_build_error=previous_build_error,
-            extra_context=extra_context,
-            tier=tier,
-            layout=layout,
-            model=chosen,
-            app_id=app_id,
-        )
-        return out, chosen
-    except (openrouter.OpenRouterError, Exception) as exc:
-        if not _is_rate_limit_error(exc):
-            raise
-        replacement = model_rotation.pick_excluding(pool, exclude={chosen.slug})
-        log.warning(
-            "%s: generator rate-limited on %s; re-rolling to %s",
-            app_id, chosen.slug, replacement.slug,
-        )
-        out = generator.generate(
-            archetype=archetype,
-            prompt=prompt,
-            source_url=item.url,
-            source_headline=item.headline,
-            source_summary=item.summary,
-            previous_build_error=previous_build_error,
-            extra_context=extra_context,
-            tier=tier,
-            layout=layout,
-            model=replacement,
-            app_id=app_id,
-        )
-        return out, replacement
-
-
-def _ship_one(item: NewsItem, *, pool: Pool) -> str:
+def _ship_one(item: NewsItem) -> str:
     """Process one news item all the way to a live Vercel URL or a logged
     rejection / stillborn marker. Returns one of:
         'shipped' | 'rejected_guard' | 'rejected_matcher' | 'rejected_archetype'
@@ -318,12 +256,9 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         headline=item.headline, summary=item.summary, tier_cfg=tier_cfg, app_id=app_id,
     )
 
-    # Generator substrate. Bangers force the reasoning-enabled member of
-    # the pool; mean_good and slop sample via standard rotation.
-    if tier_cfg.force_reasoning:
-        gen_model = model_rotation.pick_committed(pool)
-    else:
-        gen_model = model_rotation.pick_generator(pool)
+    # Generator substrate. Bundle E: single substrate, reasoning effort driven
+    # by tier (slop=disabled, mean_good=low, banger=medium).
+    gen_model = model_rotation.generator_model_for_tier(tier)
     max_build_attempts = tier_cfg.build_attempts
 
     log.info(
@@ -336,13 +271,12 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
     # 3. Generate -> verify -> static analysis -> build, with one retry on build
     # failure (per GENERATOR.md v3). Static analysis is a hard gate with NO
     # retry: a forbidden pattern is a policy violation, not a transient error.
-    # Generator gets one rate-limit re-roll to a different pool member.
     chassis_dir = settings.archetypes_dir / "tracker" / "chassis"
     work: Path | None = None
     gen_out: GeneratorOutput | None = None
     verify_outcome = None
     readme_md = ""
-    readme_model: ModelChoice | None = None
+    readme_choice: ModelChoice | None = None
     readme_persona: str | None = None
     build_ok = False
     build_err: str | None = None
@@ -350,31 +284,32 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
 
     for attempt in range(1, max_build_attempts + 1):
         try:
-            gen_out, gen_model = _generate_with_rate_limit_retry(
-                pool=pool,
-                chosen=gen_model,
+            gen_out = generator.generate(
                 archetype="tracker",
                 prompt=prompt,
-                item=item,
-                tier=tier,
-                layout=layout,
+                source_url=item.url,
+                source_headline=item.headline,
+                source_summary=item.summary,
                 previous_build_error=build_err,
                 extra_context=web_search.format_for_prompt(search_outcome) or None,
+                tier=tier,
+                layout=layout,
+                model=gen_model,
                 app_id=app_id,
             )
         except generator.GeneratorJSONError as exc:
             log.warning("%s: generator JSON error: %s", app_id, exc)
             break
         verify_outcome = verify.verify(gen_out, model=gen_model, app_id=app_id)
-        readme_model = model_rotation.pick_readme(gen_model)
+        readme_choice = model_rotation.readme_model()
         readme_persona = readme_writer.pick_persona()
-        log.info("%s: readme=%s persona=%s", app_id, readme_model.slug, readme_persona)
+        log.info("%s: readme=%s persona=%s", app_id, readme_choice.slug, readme_persona)
         readme_md = readme_writer.write(
             app_name=app_id,
             prompt=prompt,
             archetype="tracker",
             source_headline=item.headline,
-            model=readme_model,
+            model=readme_choice,
             persona=readme_persona,
             app_id=app_id,
         )
@@ -417,7 +352,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_verdict=(verify_outcome.verdict if verify_outcome else None),
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
             generator_model=gen_model.slug,
-            readme_model=(readme_model.slug if readme_model else None),
+            readme_model=(readme_choice.slug if readme_choice else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
             tier=tier,
@@ -452,7 +387,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             verifier_verdict=(verify_outcome.verdict if verify_outcome else None),
             verifier_notes=(verify_outcome.notes if verify_outcome else None),
             generator_model=gen_model.slug,
-            readme_model=(readme_model.slug if readme_model else None),
+            readme_model=(readme_choice.slug if readme_choice else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
             tier=tier,
@@ -488,7 +423,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
             generator_model=gen_model.slug,
-            readme_model=(readme_model.slug if readme_model else None),
+            readme_model=(readme_choice.slug if readme_choice else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
             tier=tier,
@@ -529,7 +464,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
             status="stillborn", death_cause="never_built",
             verifier_verdict=verify_outcome.verdict, verifier_notes=verify_outcome.notes,
             generator_model=gen_model.slug,
-            readme_model=(readme_model.slug if readme_model else None),
+            readme_model=(readme_choice.slug if readme_choice else None),
             committed_path=committed_path,
             readme_persona=readme_persona,
             tier=tier,
@@ -571,7 +506,7 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         verifier_verdict=verify_outcome.verdict,
         verifier_notes=verify_outcome.notes,
         generator_model=gen_model.slug,
-        readme_model=(readme_model.slug if readme_model else None),
+        readme_model=(readme_choice.slug if readme_choice else None),
         committed_path=committed_path,
         readme_persona=readme_persona,
         tier=tier,
@@ -610,19 +545,6 @@ def run_tick() -> TickResult:
         return TickResult(0, 0, 0, skipped_cost_cap=True)
     log.info("tick start: today_cost=$%.4f cap=$%.2f", spent, cap)
 
-    # Validate the generator pool against OpenRouter's catalog before doing
-    # anything expensive. Catches: missing slugs (model retired, typo in
-    # .env), and effective output cost (nominal x reasoning multiplier)
-    # exceeding MAX_OUTPUT_PRICE_USD_PER_M. Fails the tick clean if so;
-    # operator fixes .env and re-runs.
-    try:
-        pool = model_rotation.parse_pool()
-        model_rotation.validate_pool_pricing(pool)
-    except ModelRotationError as exc:
-        log.error("model rotation pool invalid; aborting tick: %s", exc)
-        audit.event(audit.ORCHESTRATOR, "tick.abort", reason=f"pool invalid: {exc}")
-        return TickResult(0, 0, 0, skipped_cost_cap=False)
-
     items = ingest.fetch_new_items()
     if not items:
         log.info("tick: no new items")
@@ -636,7 +558,7 @@ def run_tick() -> TickResult:
             log.info("tick: hit MAX_APPS_PER_TICK=%d, deferring rest to next tick", MAX_APPS_PER_TICK)
             break
         try:
-            outcome = _ship_one(item, pool=pool)
+            outcome = _ship_one(item)
         except Exception as exc:
             log.exception("unexpected error processing %s: %s", item.url, exc)
             continue

@@ -99,28 +99,45 @@ def _validate_output(out: GeneratorOutput) -> GeneratorOutput:
     return GeneratorOutput(files=valid)
 
 
-# Tier-aware file-count guidance, substituted into {{file_count_guidance}}
-# in the prompt. Per the brief: slop ~2, mean_good 3-6, banger 4-8.
+# Tier-aware guidance substituted into {{file_count_guidance}} in the prompt.
+# Bundle E: each tier now carries a quality persona alongside file-count
+# guidance, so the LLM internalizes the effort calibration in one block.
+# Slop ~2 files, mean_good (sub-prize-winner) 3-6 files, banger 4-8 files.
 _TIER_FILE_GUIDANCE: dict[str, str] = {
     "slop": (
-        "FILE COUNT: produce exactly 2 files. app/page.tsx (the entire UI inline) "
-        "and lib/data.ts (the hardcoded data). No separate components, no extra "
-        "modules — keep it lean, like a vibecoder who wanted to be done with it."
+        "TIER: slop. You're a vibecoder running on fumes at 3am, half a Red "
+        "Bull deep, who just wants to be DONE. Quality is whatever ships. "
+        "Broken edge cases are fine. The screenshot looks alright; that's "
+        "enough.\n\n"
+        "FILE COUNT: produce exactly 2 files. app/page.tsx (the entire UI "
+        "inline) and lib/data.ts (the hardcoded data). No separate components, "
+        "no extra modules — keep it lean."
     ),
     "mean_good": (
-        "FILE COUNT: produce 3 to 6 files. Required: app/page.tsx and lib/data.ts. "
-        "Beyond that, factor 1 to 3 reusable UI pieces into "
+        "TIER: sub-prize-winning hackathon team. You're not winning Best "
+        "Overall, but you're walking away with hardware — Best UI, or Best "
+        "Technical Execution, or Best Use of [Sponsor], or Most Innovative, "
+        "or Best Niche. Polish ONE specific dimension and let the rest be "
+        "good-enough. Most teams here are American college CS juniors who've "
+        "shipped a couple of side projects. The result feels intentional, "
+        "even if the surrounding scaffolding is rough.\n\n"
+        "FILE COUNT: produce 3 to 6 files. Required: app/page.tsx and "
+        "lib/data.ts. Beyond that, factor 1 to 3 reusable UI pieces into "
         "lib/components/<Name>.tsx files (e.g. a Card, a Filter, a Tabs). "
-        "Optionally lib/utils.ts for tiny helpers. The structure should look "
-        "like a hackathon team that organized their code halfway."
+        "Optionally lib/utils.ts for tiny helpers. Componentize where it "
+        "makes the polished dimension shine; don't over-engineer the rest."
     ),
     "banger": (
-        "FILE COUNT: produce 4 to 8 files. Required: app/page.tsx and lib/data.ts. "
-        "Factor the page into multiple distinct components in lib/components/, "
-        "with each file owning one cohesive UI piece. Optionally lib/utils.ts "
-        "for helpers and lib/types.ts for shared TypeScript types. The "
-        "structure should look like a hackathon-winning team that actually "
-        "componentized their code."
+        "TIER: best-overall hackathon team. The committed-QA cohort that "
+        "actually ships portfolio-grade work. Everything is polished. Real "
+        "data, real interactivity, real componentization, real care. This "
+        "team didn't sleep, and it shows in the artifact — coherent across "
+        "files, considered in its choices, demoable end-to-end.\n\n"
+        "FILE COUNT: produce 4 to 8 files. Required: app/page.tsx and "
+        "lib/data.ts. Factor the page into multiple distinct components in "
+        "lib/components/, with each file owning one cohesive UI piece. "
+        "Optionally lib/utils.ts for helpers and lib/types.ts for shared "
+        "TypeScript types."
     ),
 }
 

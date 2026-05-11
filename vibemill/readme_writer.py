@@ -1,17 +1,19 @@
 """README generator with persona rotation.
 
-Real producers don't all write READMEs in the same voice. The 7-persona
+Real producers don't all write READMEs in the same voice. The 12-persona
 pool here samples the distribution real vibecoders occupy: enthusiastic
 hackathon dev, terse minimalist, technical-maximalist over-documenter,
 formal corporate, gen-z vibes, self-deprecating humble, marketing-loud
-LLM-flavored. Per ANTI_PATTERNS.md rule 5 v4, sampling that distribution
-is faithfulness, not distribution-shaping.
+LLM-flavored, founder-hustle build-in-public, pretentious academic
+register, ironic shitpost, MLH-template-filled-in-at-4am, and grindset
+hustle-culture. Per ANTI_PATTERNS.md rule 5 v5, sampling at the prompt
+layer is where variance lives now (substrate rotation is gone).
 
-Persona rotation is independent of substrate (model) rotation. The
-generator's substrate is matched for within-app fingerprint coherence
-(via model_rotation.pick_readme); the persona is rolled separately so
-the same substrate occasionally produces a corporate README and
-occasionally a vibes README, depending on the dice.
+Persona rotation is independent of substrate (model). Bundle E moved
+generator + README to a single substrate (DeepSeek V4 Flash); voice
+variance is supplied entirely by persona rotation. The same substrate
+occasionally produces a corporate README and occasionally a shitpost
+README, depending on the dice.
 
 Output is plain markdown, not JSON. No retry: if the LLM's text is empty,
 ship the app with an empty README.md (the vibecoder forgot the README).
@@ -32,14 +34,21 @@ from .model_rotation import ModelChoice
 log = logging.getLogger(__name__)
 
 # (persona_name, weight). Weights must sum to 1.0.
+# Bundle E rebalanced and added 5 new personas (12 total). The new five
+# are founder_hustle, academic, shitpost, mlh_template, and grindset.
 README_PERSONAS: tuple[tuple[str, float], ...] = (
-    ("enthusiastic", 0.35),
-    ("minimalist", 0.20),
-    ("technical_maximalist", 0.10),
-    ("corporate", 0.10),
-    ("vibes", 0.10),
-    ("humble", 0.10),
+    ("enthusiastic", 0.25),
+    ("minimalist", 0.15),
+    ("mlh_template", 0.07),  # very common: literally the Devpost template
+    ("founder_hustle", 0.07),
+    ("technical_maximalist", 0.07),
+    ("corporate", 0.07),
+    ("vibes", 0.07),
+    ("humble", 0.07),
     ("chatgpt_loud", 0.05),
+    ("academic", 0.05),
+    ("shitpost", 0.05),
+    ("grindset", 0.03),
 )
 
 VALID_PERSONAS: frozenset[str] = frozenset(name for name, _ in README_PERSONAS)
@@ -98,10 +107,10 @@ def write(
 ) -> str:
     """Produce the README.md text for one app. Returns the markdown string.
 
-    `model` is the README's substrate, picked by model_rotation.pick_readme().
-    `persona` is the README voice, picked by pick_persona() — independent
-    of substrate so the same model occasionally writes corporate and
-    occasionally writes vibes.
+    `model` is the README's substrate (Bundle E: same slug as the generator
+    via model_rotation.readme_model()). `persona` is the README voice,
+    picked by pick_persona() — voice variance comes from the 12-persona
+    rotation, not from substrate variation.
     """
     user_prompt = _render(
         _load_template(persona),

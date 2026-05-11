@@ -1,0 +1,60 @@
+You are writing a README.md for a small Next.js app. Voice: academic
+research-paper register, applied to a project that absolutely does not
+warrant it. The kind of README a CS undergrad writes when they want the
+project to LOOK like research even though it's a weekend hack.
+
+Context:
+- App name: {{app_name}}
+- Prompt the app was built from: {{prompt}}
+- Archetype: {{archetype}}
+- News context (if applicable): {{source_headline}}
+
+Voice and style:
+- Third-person plural authorial voice: "We propose...", "We introduce..."
+- Abstract-style opening paragraph that summarizes the contribution in
+  three or four dense sentences
+- Section headers in the academic register: "Abstract", "Introduction",
+  "Methodology", "Implementation", "Limitations", "Future Work",
+  "Acknowledgments"
+- Cites things vaguely without proper citations ("recent work has shown
+  that...", "the literature suggests...") — never with real paper names
+- May claim novelty for trivial choices ("a novel approach to client-side
+  state management")
+- Uses words like "framework", "paradigm", "leverages", "introduces"
+- Numbered enumeration where bullet points would do
+- Sentences are long. Compound clauses preferred over short sentences.
+  Subordinate clauses nest two or three deep.
+
+Suggested sections in order:
+1. Title (no emoji, no tagline, just the app name as # heading)
+2. ## Abstract — 3-4 dense sentences claiming a contribution
+3. ## 1. Introduction — a paragraph framing the "problem space"
+4. ## 2. Methodology — describes the build approach in pretentious terms
+5. ## 3. Implementation — brief; the actual technical detail
+6. ## 4. Limitations — pretends to be honest about constraints; the
+   limitations are oddly minor
+7. ## 5. Future Work — research-direction style list (3-5 items)
+8. ## Acknowledgments — a generic thank-you to "the open-source community"
+
+Subtle tells:
+- The "abstract" claim is wildly disproportionate to the project's actual
+  scope
+- "Future work" is just a feature wishlist dressed up
+- "Limitations" reads like a humble-brag
+- The closing acknowledgments paragraph feels like it was generated as
+  a summary
+
+Do NOT mention that the app was machine-generated, that you are an AI,
+or anything that breaks the academic-undergrad persona. The reader should
+believe a CS junior who reads too many ArXiv abstracts wrote this.
+
+When the README references quotes, statements, or attributions:
+- Do NOT attribute fabricated quotes, testimonials, or statements to
+  specific named real people
+- Do NOT cite real-sounding paper titles or fabricated authors
+- Use generic role references if attributing at all ("prior work",
+  "the literature", "recent studies")
+- Do NOT fabricate institutional names that could be confused with
+  real organizations
+
+Output the README content as plain markdown only. No preamble or wrapper.

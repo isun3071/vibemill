@@ -167,65 +167,37 @@ Stillborn apps appear in the cemetery with status `stillborn` and a special tomb
 
 These are not hidden. They are part of the artifact: even an industrial app machine has a stillbirth rate. Showing it preserves the operation's honesty.
 
-## Generator substrate composition
+## Generator substrate
 
-Per-app, the orchestrator picks one model from the configured generator pool (weighted) for the codegen call. The verifier shares that pick (within-app fingerprint coherence). The README writer matches the generator under default `README_ROTATION_MODE=match_generator` (so the app feels like one human used one tool for code and copy); under `fixed`, README falls back to the legacy `README_MODEL` slug.
+Bundle E (May 2026) abandoned substrate rotation. The corpus runs on a single substrate: **DeepSeek V4 Flash** (`deepseek/deepseek-v4-flash`). Configured via `GENERATOR_MODEL` in `.env`. The README writer uses the same substrate; voice variance comes entirely from README persona rotation (12 personas in `readme_writer.py`).
 
-**Guard and matcher do not rotate.** They stay on `anthropic/claude-haiku-4.5` so the calibration work in `scripts/calibrate_matcher.py` remains comparable across runs. Guard and matcher are classifiers, not authors; rotation would only add noise.
+**Guard and matcher** stay on `anthropic/claude-haiku-4.5` for matcher calibration stability. They are classifiers, not authors.
 
-### Why rotate at all
+### Why single substrate
 
-See ANTI_PATTERNS.md rule 5 v4. The empirical observation: two production runs against live news both shipped Trackers that looked nearly identical — same palette, same card grid, same copy register, same header treatment. Real human vibecoders do converge on shape (the genre's modal point: Tailwind cards + dark mode + emoji headers) but they leave fingerprint-level variance via different tools, palette flavors, copy tics. Single-pipeline LLM output produces zero such variance, which is *less faithful* to the genre's natural distribution than the satire requires. Substrate rotation samples across the variance space the genre's real producers occupy.
+See ANTI_PATTERNS.md rule 5 v5 (and the v6 changelog entry). The earlier v4 hypothesis — that substrate variance across 8 LLMs would supply genre-faithful fingerprint variance — didn't pay out empirically. Outputs looked structurally similar regardless of which pool member produced them because the prompt was the binding constraint, not the model. Real human producers DO use different tools, but no individual hackathon team rotates 8 LLMs per project; a single team's behavior is single-substrate.
 
-### Pool composition
-
-8 generator models, weighted to approximate the substrate mix a real population of cost-conscious vibecoders uses:
-
-```
-GENERATOR_MODELS=deepseek/deepseek-v4-flash,meta-llama/llama-4-maverick,qwen/qwen3.6-flash,google/gemini-3.1-flash-lite,openai/gpt-5.4-nano,minimax/minimax-m2.7,z-ai/glm-5,xiaomi/mimo-v2.5
-GENERATOR_WEIGHTS=0.30,0.20,0.10,0.10,0.10,0.10,0.05,0.05
-```
-
-The composition is deliberate: a Chinese open-weights cohort (DeepSeek, Qwen, MiniMax, GLM, MiMo) representing the substrates non-US vibecoders increasingly default to; an American budget tier (Llama 4 Maverick, GPT-5.4 nano, Gemini 3.1 Flash Lite) representing what cost-conscious US vibecoders reach for when Cursor or Claude Code aren't paid. The weights skew toward DeepSeek + Llama because those are the modal picks empirically.
-
-Weighted-average effective output cost across this pool: ~$0.85/M. Hard cap: `MAX_OUTPUT_PRICE_USD_PER_M=2.00`.
+So variance now lives at the prompt layer: tier rotation (`tiers.py`), layout-archetype rotation within Tracker (`layouts.py`), README persona rotation (`readme_writer.py`), and the planned archetype + sub-prize-category + track conditioning expansions (Bundles F and G). Single substrate carries all of it.
 
 ### Reasoning policy
 
-```
-GENERATOR_REASONING_EFFORTS=medium,disabled,disabled,disabled,disabled,disabled,disabled,disabled
-```
+Tier-driven, set in `vibemill/model_rotation.py:_TIER_REASONING`:
 
-Only DeepSeek V4 Flash runs reasoning, at medium effort. The other 7 run reasoning-disabled. Guard, matcher, and README always run reasoning-disabled.
+| Tier | Reasoning | Effective output cost |
+|---|---|---|
+| slop | disabled | ~$0.28/M (nominal) |
+| mean_good | low | ~$0.42/M |
+| banger | medium | ~$0.84/M |
 
-**Per-model reasoning is set in env, not code.** The `vibemill/model_rotation.py` module reads the parallel arrays and refuses to launch a tick if the effort string isn't one of `disabled | low | medium | high`.
-
-**Effective cost calculation** (in `validate_pool_pricing`):
-
-| Effort | Multiplier vs. nominal completion price |
-|---|---|
-| disabled | 1.0x |
-| low | 1.5x |
-| medium | 3.0x |
-| high | 6.0x |
-
-At tick start, `validate_pool_pricing` fetches `https://openrouter.ai/api/v1/models`, looks up each pool member's nominal completion price, multiplies by the configured reasoning multiplier, compares to `MAX_OUTPUT_PRICE_USD_PER_M`. If any model breaches the cap, the tick aborts cleanly with a message. This catches "we added a model whose price went up" without hand-tracking OpenRouter's pricing.
-
-### Rationale
-
-Why this asymmetry rather than blanket-disable or blanket-enable:
-
-- **Genre faithfulness.** A real population of vibecoders does include some who turn reasoning on for the aesthetic of having thought things through, even when the underlying output is still slop. The "considered the trade-offs" prose, justified architecture choices, and more elaborate commits are real fingerprint signatures of reasoning-mode output. Reproducing them faithfully requires actually using reasoning sometimes.
-- **Cost-conscious selection pressure modeling.** Vibecoders who turn reasoning on tend to do so on the cheapest model that supports it, because reasoning multiplies the per-call cost. Of the pool, only DeepSeek V4 Flash is cheap enough that medium-effort reasoning stays under the cap. The other 7 would breach. So in our pool, only DeepSeek runs reasoning — exactly as a real cost-conscious population would distribute.
-- **The asymmetry is itself the fingerprint.** Some apps in the corpus carry the "reasoning-mode" signature; most don't. That distribution is itself faithful.
+DeepSeek V4 Flash supports adaptive reasoning at all three levels; cheapness keeps even the medium tier well under any operational cap.
 
 ### Rate limit handling
 
-If a generator call returns a rate-limit error from OpenRouter (429 or provider-side rate limit) after the openrouter client's three internal retries with exponential backoff, the orchestrator re-rolls the model from the pool (excluding the failed slug) and retries the generator call once. If that also fails, the failure flows through the existing build-retry path; if both build attempts ultimately fail, the app is stillborn `never_built` per the existing failure handling. No complex fallback chain.
+OpenRouter's client retries 429s and 5xxs internally with exponential backoff. If the generator call ultimately raises through both the SDK retry and `generator.generate`'s one-shot JSON retry, the failure flows through the build-retry path; if all build attempts fail, the app is stillborn `never_built`. No multi-model fallback (no pool to fall back to). Rate limits should be rare at this tick frequency.
 
 ### Per-app model identity is recorded, not displayed
 
-Both the generator's slug and the README's slug land in the SQLite `apps` table (columns `generator_model`, `readme_model`, added by migration 003) and mirror to Supabase. **The model identity does NOT appear in the generated app's footer.** Per ANTI_PATTERNS rule 10 (do not advertise the satire), the canonical footer copy from `VOICE.md` is unchanged. Recording the model identity for fingerprint-pattern analysis is operational instrumentation; displaying it in the artifact would turn the app into a self-aware demo.
+The generator's slug and the README's slug both land in the SQLite `apps` table (columns `generator_model`, `readme_model`, added by migration 003) and mirror to Supabase. With single substrate, these two columns will be identical and constant per-Bundle-E-era app; they're kept for historical comparability with pre-Bundle-E rows. **The model identity does NOT appear in the generated app's footer.** Per ANTI_PATTERNS rule 10 (do not advertise the satire), the canonical footer copy from `VOICE.md` is unchanged.
 
 ## Three-tier output calibration
 
@@ -233,11 +205,11 @@ Supersedes the v0.5 committed-path workflow. Per generation, the orchestrator ro
 
 | Tier | Weight | Behavior | Estimated cost |
 |---|---|---|---|
-| `slop` | 10% | No web search. Standard substrate rotation. 1 build retry (2 attempts). Hardcoded fabricated data. | ~$0.05/app |
-| `mean_good` | 82% | Web search (up to 3 queries via Tavily). Standard substrate rotation. 1 build retry. Real-data foundation, fabricated decoration. | ~$0.30/app |
-| `banger` | 8% | Web search (up to 6 queries). Reasoning-enabled substrate (highest-weighted reasoning-enabled pool member). 3 build retries (4 attempts). Real data primary. Sets `apps.committed_path = true` for backwards compatibility. | ~$0.70/app |
+| `slop` | 10% | No web search. Reasoning disabled. 1 build retry (2 attempts). Hardcoded fabricated data. Vibecoder running on fumes at 3am. | ~$0.05/app |
+| `mean_good` | 82% | Web search (up to 4 queries via Tavily). Reasoning at LOW. 2 build retries (3 attempts). Real-data foundation, fabricated decoration. Sub-prize-winning hackathon team — polished in one dimension. | ~$0.40/app |
+| `banger` | 8% | Web search (up to 6 queries). Reasoning at MEDIUM. 3 build retries (4 attempts). Real data primary, minimal fabrication. Best-overall committed-QA cohort. Sets `apps.committed_path = true` for backwards compatibility. | ~$0.70/app |
 
-The dice roll is **independent of input score, archetype, or any other signal** — purely random sampling. Per ANTI_PATTERNS rule 5 v4, this samples the producer-population's distribution of effort faithfully rather than routing on quality.
+The dice roll is **independent of input score, archetype, or any other signal** — purely random sampling. Per ANTI_PATTERNS rule 5 v5, this samples the producer-population's distribution of effort faithfully rather than routing on quality. Bundle E recalibrated mean_good upward from "median junior portfolio" to "sub-prize winner"; cost rose from ~$0.30 to ~$0.40 per app.
 
 ### Why three tiers, not two or one
 

@@ -143,11 +143,9 @@ def _run_happy_pipeline(
     prompt = f"{item.headline}. {item.summary}".strip()
     fixture = result.fixture
 
-    # Use the first pool member for reproducibility of the smoke test. Real
-    # rotation distribution is verified by scripts/verify_rotation.py
-    # (statistical) and by manual end-to-end runs.
-    pool = model_rotation.parse_pool()
-    smoke_model = pool.choices[0]
+    # Bundle E: single substrate. Pin to mean_good's effort for smoke
+    # reproducibility (the tier itself is pinned to mean_good below).
+    smoke_model = model_rotation.generator_model_for_tier("mean_good")
     log.info("[%s] using model=%s reasoning=%s", fixture, smoke_model.slug, smoke_model.reasoning_effort)
 
     # Pin persona to enthusiastic for reproducibility (the actual rotation

@@ -1,8 +1,10 @@
 # Anti-Patterns
 
+> **Changelog v6:** Rule 5 → v5 (variance lives at the prompt layer, not substrate). Substrate rotation across the 8-model generator pool is gone; the corpus runs on a single substrate (DeepSeek V4 Flash, reasoning effort driven by tier). Empirically, substrate rotation was reading as fingerprint *noise* rather than fingerprint *variance* — outputs looked similar regardless of which model produced them because the prompt was the binding constraint. Layout-archetype rotation (Bundle C), tier-driven effort (Bundle A), upcoming archetype expansion (planned Bundle F), upcoming sub-prize-category and track conditioning (planned Bundle G), and README persona rotation (still in force) are where the visible variance now lives. Single substrate is also arguably MORE faithful to any individual hackathon team's behavior (no team rotates 8 models). Rule 1 simplifies in turn: reasoning is tier-driven (slop disabled, mean_good low, banger medium), not pool-asymmetric.
+
 > **Changelog v5:** Removed rules 11 (no runtime fetching), 12 (no persistent storage), and 13 (no parallel instances). 11 and 12 always sat awkwardly in this document — they were scope/safety constraints on generated apps, not "preserve faithfulness" rules — and removing them is consistent with the genre: real vibecoders DO wire up flaky `fetch()` calls and reach for `localStorage`. Rule 13 was operational, not satirical. Static analysis (`vibemill/security.py`) keeps the pre-existing safety patterns (`eval`, `child_process`, raw socket APIs, etc.) but no longer blocks fetch/storage.
 
-> **Changelog v4:** Refined rules 1 and 5 in coordination. Rule 1 v4 allows reasoning where deliberately configured (DeepSeek V4 Flash at medium effort within the generator pool); the asymmetry across the pool is itself faithful to a real population of cost-conscious vibecoders. Rule 5 v4 distinguishes "do not filter to flatter the genre" (unchanged) from "DO sample across the variance space real human producers occupy" (new): single-pipeline LLM output is not the genre's natural distribution, so substrate rotation across the generator + README pool is faithfulness, not distribution-shaping. See `vibemill/model_rotation.py` and `OPERATIONS.md` "Generator substrate composition" for the implementation.
+> **Changelog v4:** Refined rules 1 and 5 in coordination. Rule 1 v4 allowed reasoning where deliberately configured (DeepSeek V4 Flash at medium effort within the generator pool); the asymmetry across the pool was itself faithful to a real population of cost-conscious vibecoders. Rule 5 v4 distinguished "do not filter to flatter the genre" (unchanged) from "DO sample across the variance space real human producers occupy" (the substrate-rotation argument). **Superseded by v5/v6** — see above.
 
 This document lists design choices that look like bugs, code smells, or "things to clean up later" — but are actually load-bearing for the project's purpose. They must not be improved.
 
@@ -22,19 +24,20 @@ The reference question is always: **"Does the median vibecoder do this?"** If ye
 
 ## The anti-patterns
 
-### 1. Reasoning model use must be deliberate, not default (v4)
+### 1. Reasoning model use is tier-driven, not default (v5)
 
 Reasoning-mode generator calls produce distinct fingerprints — longer "considered the trade-offs" prose, justified architecture choices, more elaborate commits — that ARE faithful to the genre. Real vibecoders turn on reasoning for the aesthetic of having thought things through, even when the underlying output remains slop.
 
-Reasoning is allowed where deliberately configured. Current generator pool policy (see `vibemill/model_rotation.py` and `OPERATIONS.md`):
+Reasoning is tier-driven (see `vibemill/model_rotation.py`):
 
-- **DeepSeek V4 Flash: reasoning at medium effort.** The model is cheap enough (~$0.84/M effective output at medium reasoning) that reasoning overhead stays well under the hard cap. Its strong SWE-bench performance produces the recognizable "I thought this through" fingerprint vibecoders perform.
-- **All 7 other generator pool members: reasoning disabled.** Their effective costs at any non-zero reasoning effort would push past the hard cap (`MAX_OUTPUT_PRICE_USD_PER_M`).
+- **Slop tier (~10%): reasoning disabled.** The vibecoder running on fumes at 3am isn't turning on reasoning. Cheapest, fastest, sloppiest.
+- **Mean_good tier (~82%): reasoning LOW.** A touch of reasoning for cross-file coherence — the sub-prize-winning team thought a *little* about it. Effective output ~$0.42/M.
+- **Banger tier (~8%): reasoning MEDIUM.** The committed-QA team actually deliberates. Effective output ~$0.84/M.
 - **Guard and matcher: reasoning disabled.** Fast classification, not deliberation.
 
-The asymmetry is itself faithful: in a real population of vibecoders, only a subset turn reasoning on, and they tend to do so on the cheapest model that supports it (cost-conscious selection pressure). Vibe Mill's distribution mirrors this.
+The per-tier asymmetry is itself faithful: in a real population of vibecoders, the half-assing cohort doesn't toggle reasoning; the polishing cohort does. Vibe Mill mirrors that.
 
-**If you find yourself wanting to enable reasoning across the whole pool "to fix the bug rate":** the bug rate is not a bug. It is the artifact. The reasoning-vs-fast asymmetry is itself fingerprint variance.
+**If you find yourself wanting to enable reasoning across all tiers "to fix the bug rate":** the bug rate is not a bug. It is the artifact. The tier-vs-tier asymmetry IS fingerprint variance — and so is the difference between a reasoning-on banger and a reasoning-off slop.
 
 ### 2. Do not add hallucination suppression
 
@@ -73,7 +76,7 @@ In normal applications these are calibration failures. In Vibe Mill, they are *w
 - Add hedging instructions to the generator prompt ("flag uncertainty", "note when data is incomplete")
 - Add a calibration pass that softens overconfident claims
 
-### 5. Do not filter to flatter the genre. DO sample real-producer variance. (v4)
+### 5. Do not filter to flatter the genre. DO sample variance at the prompt layer. (v5)
 
 **Don't filter the bad to make Vibe Mill look more competent than real slop.** The output of vibecoded slop is what it is — including broken builds, malformed JSON, embarrassingly bad copy. Some Vibe Mill apps will be visibly broken. Charts that render upside down. Date logic that fails for any year other than 2024. Dark mode toggles that delete user state on the second click. Maps with placeholder coordinates pointing to the middle of the Atlantic.
 
@@ -81,19 +84,20 @@ These apps are *the most representative*. Filtering them out would skew the publ
 
 **Ship them. Do not retry. Do not hide.**
 
-The only outputs that should be excluded are those that fail the build entirely (compile errors after one retry) or fail the static security scan (`SUSPICIOUS_PATTERNS` in `SECURITY.md`). Everything else ships.
+The only outputs that should be excluded are those that fail the build entirely (compile errors after the tier's retry budget) or fail the static security scan (`SUSPICIOUS_PATTERNS` in `SECURITY.md`). Everything else ships.
 
-**AND: faithful representation of the genre includes fingerprint-level variance.** Real vibecoders leave individual marks via different tools, palettes, layouts, copy registers, and small idiosyncratic choices. Two humans producing structurally-identical Trackers for the same news headline would not converge on identical UI down to the pixel — they'd differ in palette flavor, copy tics, small idiosyncratic choices.
+**AND: faithful representation of the genre includes visible variance — but variance lives at the PROMPT LAYER, not at substrate rotation.**
 
-Single-pipeline LLM output (one model, one temperature, one prompt) produces zero fingerprint variance. That is not the genre's natural distribution; the genre's natural distribution is across thousands of human producers using different tools.
+Bundle E (this codebase, May 2026) abandoned substrate rotation after v4's hypothesis didn't pay out empirically. Substrate variance across 8 different LLMs was producing *fingerprint noise*, not *fingerprint variance* — outputs looked structurally similar regardless of which model wrote them because the prompt was the binding constraint. Real human producers DO use different tools, but no individual team rotates 8 tools per project. A single team's behavior is single-substrate; the across-team variance lives in *what they choose to build* and *how they structure it*, not in *which LLM they typed at*.
 
-Sampling across the variance space real human producers occupy is **faithfulness, not distribution-shaping.**
+So Vibe Mill's variance lives at the prompt layer now:
+- **Tier rotation** (`vibemill/tiers.py`) — three effort levels (slop / sub-prize-winner / banger) with different search, retry, reasoning budgets
+- **Layout-archetype rotation within Tracker** (`vibemill/layouts.py`, Bundle C) — 8 structural layouts (dashboard / long_form / map / chart / editorial / card_feed / list / split_view)
+- **Archetype rotation** (planned Bundle F) — incremental expansion of the buildable archetype set
+- **Track conditioning + sub-prize category** (planned Bundle G) — hackathon-track-derived idea scoping and per-app polish-axis sampling
+- **README persona rotation** (`vibemill/readme_writer.py`) — voice variance via 12 distinct README personas; orthogonal to everything else
 
-The distinction:
-- **Don't filter to remove the bad.** A broken Tracker ships.
-- **DO sample across substrate variance.** Generator + README rotate through a configured pool (`vibemill/model_rotation.py`) so the corpus carries fingerprint marks of multiple substrates, mirroring the multi-tool reality of the producer population the satire targets.
-
-Prompt-side variance dimensions (palette, layout primitive, copy register, header style) are deferred to a later session — they're a different change.
+Single substrate (DeepSeek V4 Flash) carries all of it. Cheap enough to support the prompt-layer expansion, capable enough to render any of the above.
 
 ### 6. Do not add post-deployment monitoring or alerting
 

@@ -120,7 +120,19 @@ Versioned prompt files. Each is plain text with `{{variable}}` placeholders.
 prompts/
 ├── guard.txt                     # safety check prompt (haiku)
 ├── matcher.txt                   # 12-archetype scoring prompt (haiku)
-├── readme.txt                    # vibecoder-persona README prompt (cheap model)
+├── readme/                       # 12 README personas (Bundle E: +5 from 7)
+│   ├── enthusiastic.txt
+│   ├── minimalist.txt
+│   ├── mlh_template.txt          # Devpost submission template filled in literally
+│   ├── founder_hustle.txt        # building-in-public voice
+│   ├── technical_maximalist.txt
+│   ├── corporate.txt
+│   ├── vibes.txt
+│   ├── humble.txt
+│   ├── chatgpt_loud.txt
+│   ├── academic.txt              # research-paper register
+│   ├── shitpost.txt              # ironic / self-aware
+│   └── grindset.txt              # 48hr no-sleep energy
 └── generator/
     ├── tracker/                  # Bundle C: layout-archetype rotation
     │   ├── dashboard.txt         # ~30%: stat cards + section

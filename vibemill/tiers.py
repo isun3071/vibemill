@@ -2,28 +2,32 @@
 
 Per generation, the orchestrator rolls a single die at fixed weights:
 
-  SLOP       (~10%) — current behavior preserved. Hardcoded fabricated data,
-                      no web search, single attempt + 1 retry. Represents the
-                      abandoned/late-night/ship-and-forget vibecoder. ~$0.05/app.
-  MEAN_GOOD  (~82%) — NEW DEFAULT. Web search (up to 3 queries) provides
-                      real-data foundation. Fabricated metrics + statuses +
-                      visual decoration on top. Standard substrate rotation.
-                      Represents typical good hackathon team / median junior
-                      portfolio piece. ~$0.30/app.
-  BANGER     (~8%)  — Web search (up to 6 queries) + reasoning-enabled model
-                      + 4 build attempts (3 retries). Real data primary,
-                      minimal fabrication. Represents committed-QA cohort.
-                      ~$0.70/app.
+  SLOP       (~10%) — abandoned/late-night/ship-and-forget vibecoder.
+                      Hardcoded fabricated data, no web search, single attempt
+                      + 1 retry. Reasoning disabled. ~$0.05/app.
+  MEAN_GOOD  (~82%) — sub-prize-winning hackathon team (Best UI / Best Tech /
+                      Best Use of X / Most Innovative / Best Niche). Polished
+                      in one specific dimension. Web search (up to 4 queries)
+                      grounds in real data. Reasoning at LOW for cross-file
+                      coherence. ~$0.40/app.
+  BANGER     (~8%)  — best-overall hackathon team / committed-QA cohort.
+                      Web search (up to 6 queries), reasoning at MEDIUM,
+                      4 build attempts. Real data primary, minimal
+                      fabrication. ~$0.70/app.
 
-Per ANTI_PATTERNS rule 5 v4 (sample real-producer variance), this samples
-the actual distribution of effort the genre's producer population occupies.
-The dice roll is INDEPENDENT of input score, archetype, headline content,
-or any other signal — purely random sampling.
+Per ANTI_PATTERNS rule 5 v5 (variance lives at the prompt layer), tier
+selection is the effort-allocation axis, archetype/layout/sub-prize-category
+are the shape axes, persona is the voice axis. Substrate is fixed (DeepSeek
+V4 Flash; reasoning effort varies per tier via model_rotation).
 
-The slop tier preserves the original verifier-attesting-to-garbage satirical
-content. Tier 2/3 verifier-attesting-to-decent-work is itself genre-faithful
-(real vibecoders' Cursor/Claude Code verifiers also rubber-stamp decent work).
-The satirical payload shifts from per-app irony to corpus-distribution irony.
+Tier roll is INDEPENDENT of input score, archetype, headline, or any other
+signal — purely random sampling of the producer-population distribution.
+
+Bundle E recalibrated MEAN_GOOD upward from "median junior portfolio piece"
+to "sub-prize winner". Sub-prize winners polish ONE thing well (UI, or
+technical depth, or sponsor integration, or pitch); they don't sweep
+"Best Overall" but they do walk away with hardware. This is the target the
+60% non-news pipeline (future Bundle G) is calibrated against.
 """
 
 from __future__ import annotations
@@ -59,12 +63,12 @@ _validate_weights()
 @dataclass(frozen=True)
 class TierConfig:
     """Per-tier behavior parameters. Concrete values, no plugin hooks
-    (per ANTI_PATTERNS rule 8)."""
+    (per ANTI_PATTERNS rule 8). Reasoning effort moved to model_rotation
+    (Bundle E); it's now tier-driven there, not configured here."""
     tier: TierName
     do_search: bool
     max_search_queries: int
     build_attempts: int  # total attempts, not retries (1 = no retry)
-    force_reasoning: bool
     estimated_cost_usd: float
 
 
@@ -76,23 +80,20 @@ TIER_CONFIGS: dict[TierName, TierConfig] = {
         do_search=False,
         max_search_queries=0,
         build_attempts=2,
-        force_reasoning=False,
         estimated_cost_usd=0.05,
     ),
     TIER_MEAN_GOOD: TierConfig(
         tier=TIER_MEAN_GOOD,
         do_search=True,
-        max_search_queries=3,
-        build_attempts=2,
-        force_reasoning=False,
-        estimated_cost_usd=0.30,
+        max_search_queries=4,  # was 3 — sub-prize winners ground harder
+        build_attempts=3,       # was 2 — sub-prize winners polish more
+        estimated_cost_usd=0.40,  # was 0.30; reasoning=low adds ~$0.05-0.10
     ),
     TIER_BANGER: TierConfig(
         tier=TIER_BANGER,
         do_search=True,
         max_search_queries=6,
         build_attempts=4,
-        force_reasoning=True,
         estimated_cost_usd=0.70,
     ),
 }

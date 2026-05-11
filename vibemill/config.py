@@ -31,18 +31,14 @@ class Settings(BaseSettings):
 
     GUARD_MODEL: str = "anthropic/claude-haiku-4.5"
     MATCHER_MODEL: str = "anthropic/claude-haiku-4.5"
-    GENERATOR_MODEL: str = "deepseek/deepseek-chat-v3"  # legacy single-model knob; rotation pool below supersedes
-    README_MODEL: str = "anthropic/claude-haiku-4.5"  # used only when README_ROTATION_MODE=fixed
-
-    # Generator + README model rotation. See vibemill/model_rotation.py and
-    # OPERATIONS.md "Generator substrate composition". Three parallel
-    # comma-separated lists; lengths must match. Weights must sum to 1.0.
-    # Reasoning efforts: disabled | low | medium | high.
-    GENERATOR_MODELS: str = "deepseek/deepseek-chat-v3"
-    GENERATOR_WEIGHTS: str = "1.0"
-    GENERATOR_REASONING_EFFORTS: str = "disabled"
-    README_ROTATION_MODE: str = "match_generator"  # match_generator | fixed
-    MAX_OUTPUT_PRICE_USD_PER_M: float = 2.00
+    # Bundle E: single substrate for generator + README. See model_rotation.py
+    # and ANTI_PATTERNS.md rule 5 v5 (variance lives at the prompt layer, not
+    # at substrate rotation). DeepSeek V4 Flash for cost + reasoning support.
+    GENERATOR_MODEL: str = "deepseek/deepseek-v4-flash"
+    # Legacy — kept for backwards-compat with operator .env files that still
+    # set it. No longer read by the orchestrator (README writer reuses
+    # GENERATOR_MODEL via model_rotation.readme_model()).
+    README_MODEL: str = "anthropic/claude-haiku-4.5"
 
     # DEPRECATED in v0.5: superseded by the three-tier output calibration
     # (see vibemill/tiers.py). The banger tier (~8%) replaces the
