@@ -2,7 +2,7 @@
 
 > **Changelog v4:** The chassis is now thinner and the generator has wider creative freedom within each archetype. The chassis provides only layout (with footer), package.json, Tailwind config, postcss config, next.config.js, .gitignore, globals.css. UI primitives are no longer in the chassis; the LLM designs the page from inline JSX. Data shape in `lib/data.ts` is LLM-defined per app. This is the within-archetype companion to the substrate rotation in v0.5; per `ANTI_PATTERNS.md` rule 5 v4, sampling across the visible variance real human producers occupy is faithfulness, not distribution-shaping. See `archetypes/tracker/example/` for one possible Tracker shape (the actual generated apps will look quite different).
 
-> **Changelog v3:** Added the static analysis pass between verification and build. This enforces `ANTI_PATTERNS.md` rules 11 (no runtime data fetching) and 12 (no persistent storage) at the build pipeline level. See `SECURITY_ADDITIONS.md` for the SUSPICIOUS_PATTERNS additions. No other behavioral changes from v2.
+> **Changelog v3:** Added the static analysis pass between verification and build. Enforces the safety patterns in `SECURITY.md` (`eval`, `child_process`, raw socket APIs, etc.) at the build pipeline level. No other behavioral changes from v2.
 
 > **Changelog v2:** Added the verification pass between generation and build. Added `verifier_verdict` and `verifier_notes` columns to apps schema (see `migrations/*/002_add_verifier_columns.sql`). Generator now produces two files (page_tsx, data_ts); README is a separate stage per `PERSONAS.md`. Added cross-reference to `ANTI_PATTERNS.md`.
 
@@ -120,13 +120,15 @@ Run the verifier at temperature **0.3**. Lower than the generator (0.7) but not 
 
 ## Static analysis pass
 
-After verification and before the build, the orchestrator runs a regex scan on the slot files against `SUSPICIOUS_PATTERNS` (defined in `vibemill/security.py`, specified in `SECURITY.md` and `SECURITY_ADDITIONS.md`).
+After verification and before the build, the orchestrator runs a regex scan on the slot files against `SUSPICIOUS_PATTERNS` (defined in `vibemill/security.py`, specified in `SECURITY.md`).
 
 ### What it enforces
 
-- ANTI_PATTERNS rule 11: no runtime data fetching (catches `fetch`, `axios`, `httpx`, scraping libraries)
-- ANTI_PATTERNS rule 12: no persistent storage (catches database clients, `sessionStorage`, cookie writes; conditional check for `localStorage` based on archetype)
-- Pre-existing safety patterns (`eval`, `child_process`, etc.)
+- Code-injection vectors (`eval`, `new Function`, `require('https://...')`)
+- Process spawning and filesystem access from generated code (`child_process`, `fs.*`)
+- Raw socket APIs (`net`, `dgram`, `tls`)
+
+Runtime fetching and storage (`fetch`, `axios`, `localStorage`, `sessionStorage`, etc.) are NOT blocked — broken or flaky network paths and ad-hoc client storage are on-brand for the genre.
 
 ### Behavior
 
@@ -213,8 +215,8 @@ Run via: `python -m vibemill.smoke_test`.
 
 ## See also
 
-- `ANTI_PATTERNS.md` — rules about what NOT to improve. Especially rule 3 (verification prompt), rule 4 (calibration), rule 11 (no scraping), rule 12 (no persistence).
+- `ANTI_PATTERNS.md` — rules about what NOT to improve. Especially rule 3 (verification prompt) and rule 4 (calibration).
 - `MATCHER.md` — guard and matcher stages preceding the generator.
 - `PERSONAS.md` — the readme writer (a separate LLM call) uses different voice rules than the generator.
 - `OPERATIONS.md` — how stillborn apps are recorded and surfaced.
-- `SECURITY.md` + `SECURITY_ADDITIONS.md` — the SUSPICIOUS_PATTERNS list enforcing rules 11 and 12.
+- `SECURITY.md` — the SUSPICIOUS_PATTERNS list (code-injection + raw socket safety).

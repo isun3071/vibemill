@@ -191,7 +191,6 @@ def _run_happy_pipeline(
         log.info("[%s] 6/10 static analysis (attempt %d)", fixture, attempt)
         sa = security.static_analysis(
             {f.path: f.content for f in v_out.output.files},
-            archetype="tracker",
         )
         result.static_analysis_safe = sa.safe
         if not sa.safe:

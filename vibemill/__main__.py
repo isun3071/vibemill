@@ -390,7 +390,6 @@ def _ship_one(item: NewsItem, *, pool: Pool) -> str:
         # Bundle D: scan all files in the LLM-produced set.
         sa = security.static_analysis(
             {f.path: f.content for f in verify_outcome.output.files},
-            archetype="tracker",
         )
         if not sa.safe:
             log.warning("%s: static analysis stillborn (attempt %d): %s", app_id, attempt, sa.reason)

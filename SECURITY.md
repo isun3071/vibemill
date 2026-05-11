@@ -118,56 +118,30 @@ The orchestrator runs `next build` against LLM-generated code. This is **executi
 - **Build in a temp directory** (`/tmp/vibemill-build-{uuid}`) that is deleted after the build completes
 - **No environment variables exposed to the build.** The chassis does not consume any env vars at build time.
 - **No filesystem access beyond the temp directory.** Run `next build` with reduced privileges if feasible (a dedicated unprivileged user; not implemented in V0 but considered for V1).
-- **Static analysis check** before building: scan the generated code for suspicious patterns (`fetch(`, `eval(`, `child_process`, `fs.writeFile`). If found, mark the app stillborn rather than building. This filters out the LLM accidentally writing dangerous code without imposing burdensome sandboxing.
+- **Static analysis check** before building: scan the generated code for suspicious patterns (`eval(`, `child_process`, `fs.writeFile`, raw socket APIs). If found, mark the app stillborn rather than building. This filters out the LLM accidentally writing dangerous code without imposing burdensome sandboxing.
 
-The static analysis check runs in `vibemill/security.py`, called by the orchestrator after the verifier and before the `next build` step. See `SECURITY_ADDITIONS.md` for the patch context. The full pattern list (also enforces `ANTI_PATTERNS.md` rules 11 and 12):
+The static analysis check runs in `vibemill/security.py`, called by the orchestrator after the verifier and before the `next build` step. The full pattern list:
 
 ```python
 SUSPICIOUS_PATTERNS_UNIVERSAL = (
-    # Pre-existing safety
+    # Code-injection vectors
     r"\beval\s*\(",
     r"\bnew\s+Function\s*\(",
-    r"\bchild_process\b",
-    r"\bfs\.\w+",
     r"\brequire\s*\(\s*[\"']https?:",
 
-    # Rule 11: runtime data fetching
-    r"\bfetch\s*\(",
-    r"\baxios\b",
-    r"\bhttpx\b",
-    r"\bgot\s*\(",
-    r"\bnode-fetch\b",
-    r"\bcheerio\b",
-    r"\bjsdom\b",
-    r"\bpuppeteer\b",
-    r"\bplaywright\b",
+    # Process / filesystem
+    r"\bchild_process\b",
+    r"\bfs\.\w+",
 
-    # Rule 12: persistent storage (database clients)
-    r"\bpg\b",
-    r"\bmysql2?\b",
-    r"@supabase/supabase-js",
-    r"@vercel/kv",
-    r"@vercel/postgres",
-    r"better-sqlite3",
-    r"\bprisma\b",
-    r"@planetscale/database",
-    r"\bneon-database\b",
-    r"@neondatabase/serverless",
-
-    # Forbidden node APIs
+    # Raw socket APIs
     r"\bnet\.",
     r"\bdgram\.",
     r"\btls\.",
     r"\bcrypto\.subtle",
-
-    # Rule 12: storage APIs forbidden in all archetypes
-    r"\bsessionStorage\b",
-    r"document\.cookie\s*=",
 )
 ```
 
-`localStorage` is permitted only in the `glorified_todo` archetype; the
-`static_analysis(slot_files, archetype)` function applies this conditionally.
+Runtime fetching (`fetch`, `axios`, etc.) and client storage (`localStorage`, `sessionStorage`, cookies) are intentionally NOT blocked — broken or flaky network paths and ad-hoc storage are on-brand for the genre. See `ANTI_PATTERNS.md` changelog v5.
 
 These patterns are NOT exhaustive; the goal is to catch the obvious cases
 while keeping false positives low. On match: app is stillborn with

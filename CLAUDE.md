@@ -1,6 +1,8 @@
 # Vibe Mill
 
-> **Changelog v3:** Updated cadence to every-4-hours (was hourly). Added references to ANTI_PATTERNS rules 11/12/13 in the do-not-improve list. Added SECURITY_ADDITIONS.md to the document map. Updated thesis epigraph to the more recent Karpathy quote.
+> **Changelog v4:** Removed ANTI_PATTERNS rules 11 (no runtime fetching), 12 (no persistent storage), and 13 (no parallel instances) along with their references in this file. Generated apps may now use `fetch()`, `localStorage`, etc. — broken/flaky network paths are on-brand for the genre. Static analysis still enforces pre-existing safety patterns (`eval`, `child_process`, etc.); SECURITY_ADDITIONS.md is gone.
+
+> **Changelog v3:** Updated cadence to every-4-hours (was hourly). Updated thesis epigraph to the more recent Karpathy quote.
 
 > *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."*
 > — Andrej Karpathy, October 2025
@@ -44,7 +46,7 @@ Implement only the following in v0:
 - **Matcher** (claude haiku via OpenRouter, t=0) scoring against the **Tracker** archetype only; threshold 7
 - **Code generator** (DeepSeek V3 via OpenRouter, t=0.7) producing Tracker apps
 - **Verification pass** (DeepSeek V3 via OpenRouter, t=0.3, one-sentence prompt) — informational, not gating
-- **Static analysis** enforcing ANTI_PATTERNS rules 11 and 12 (see `SECURITY.md` and `SECURITY_ADDITIONS.md`)
+- **Static analysis** enforcing the safety patterns in `SECURITY.md` (`eval`, `child_process`, raw socket APIs, etc.)
 - **Readme writer** (claude haiku via OpenRouter) producing vibecoder-persona READMEs
 - **GitHub publisher** creating repos in the `vibemill-apps` org with fake commit history
 - **Vercel deployer** auto-deploying via the Vercel API
@@ -80,9 +82,6 @@ Read `ANTI_PATTERNS.md` for the full list. The headline rules:
 - Do not add post-deployment error monitoring on generated apps
 - Do not "tighten" the readme persona — its tells are deliberate
 - Do not advertise the satire in user-facing copy
-- **Do not allow runtime data fetching in generated apps** (Rule 11)
-- **Do not allow persistent storage in generated apps** (Rule 12)
-- **Do not scale Vibe Mill to multiple parallel instances** (Rule 13)
 
 ## Document map
 
@@ -95,12 +94,11 @@ For implementation details, read these in order:
 - `ARCHETYPES.md` — the 12 archetype specifications
 - `MATCHER.md` — guard + judge prompts and logic
 - `GENERATOR.md` — codegen + verification + retry policy
-- **`ANTI_PATTERNS.md`** — what NOT to improve. Required reading. Now includes rules 11 (no scraping), 12 (no persistence), 13 (no scaling).
+- **`ANTI_PATTERNS.md`** — what NOT to improve. Required reading.
 - `VOICE.md` — brand voice for mill-authored copy
 - `PERSONAS.md` — distinguishing mill voice from generated-readme voice
 - `OPERATIONS.md` — rotation, rate limits, content policy, failure modes
 - `SECURITY.md` — token handling, env vars, no-commit list
-- `SECURITY_ADDITIONS.md` — patches to SUSPICIOUS_PATTERNS for ANTI_PATTERNS rules 11/12 enforcement
 - `README.md` — dev setup and deploy steps
 - `DIRECTORY.md` — repository structure
 

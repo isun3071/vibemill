@@ -74,12 +74,11 @@ Constraints (the only hard rules):
 - Tailwind utility classes are your default styling tool. You can ALSO
   use inline style={{}} attributes and write custom CSS in a styles
   file. Anything Tailwind cannot express cleanly belongs in CSS.
-- All data is hardcoded in lib/data.ts (and optionally other lib/
-  modules) and imported into page.tsx. Do NOT fetch from any
-  external source at runtime — no fetch, no axios, no scraping
-  libraries. The data is baked in at build time and frozen.
-- No persistent storage: no database imports, no localStorage, no
-  sessionStorage, no cookie writes.
+- Data is typically hardcoded in lib/data.ts (and optionally other
+  lib/ modules) and imported into page.tsx. Runtime fetch() to
+  public APIs and localStorage / sessionStorage / cookies are also
+  allowed when they fit the app — flaky network paths and ad-hoc
+  storage are on-brand for the genre.
 - Do NOT include a footer in page.tsx — the chassis layout renders one.
 - The app must build cleanly with `next build`.
 - If you import from another file you produced, MAKE SURE that file

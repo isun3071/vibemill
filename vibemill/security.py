@@ -1,8 +1,12 @@
 """Static analysis for generated slot files.
 
-Hard policy gate per ANTI_PATTERNS.md rules 11 (no runtime data fetching)
-and 12 (no persistent storage), plus the pre-existing safety patterns from
-SECURITY.md (eval, child_process, etc.).
+Hard policy gate over a small set of safety patterns: code-injection vectors,
+process spawning, raw filesystem and socket access. See SECURITY.md.
+
+Rules 11 (no runtime fetching) and 12 (no persistent storage) were removed
+in ANTI_PATTERNS.md v5; flaky `fetch()`, `localStorage`, `sessionStorage`,
+and database client imports are no longer blocked. Broken or flaky network
+paths and ad-hoc client storage are on-brand for the genre.
 
 The static analysis runs after the verifier and before the build (per
 GENERATOR.md v3 "Static analysis pass"). On match: app is stillborn with
@@ -19,54 +23,24 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# Universal patterns: forbidden in every archetype.
+# Forbidden in every archetype. Code-injection vectors, process / filesystem,
+# raw socket APIs. See SECURITY.md.
 SUSPICIOUS_PATTERNS_UNIVERSAL: tuple[str, ...] = (
-    # Pre-existing safety patterns (SECURITY.md v1)
+    # Code-injection vectors
     r"\beval\s*\(",
     r"\bnew\s+Function\s*\(",
-    r"\bchild_process\b",
-    r"\bfs\.\w+",
     r"\brequire\s*\(\s*[\"']https?:",
 
-    # Rule 11: runtime data fetching
-    r"\bfetch\s*\(",
-    r"\baxios\b",
-    r"\bhttpx\b",
-    r"\bgot\s*\(",
-    r"\bnode-fetch\b",
-    r"\bcheerio\b",
-    r"\bjsdom\b",
-    r"\bpuppeteer\b",
-    r"\bplaywright\b",
+    # Process / filesystem
+    r"\bchild_process\b",
+    r"\bfs\.\w+",
 
-    # Rule 12: persistent storage
-    r"\bpg\b",
-    r"\bmysql2?\b",
-    r"@supabase/supabase-js",
-    r"@vercel/kv",
-    r"@vercel/postgres",
-    r"better-sqlite3",
-    r"\bprisma\b",
-    r"@planetscale/database",
-    r"\bneon-database\b",
-    r"@neondatabase/serverless",
-
-    # Forbidden node APIs
+    # Raw socket APIs
     r"\bnet\.",
     r"\bdgram\.",
     r"\btls\.",
     r"\bcrypto\.subtle",
-
-    # Storage APIs forbidden in all archetypes (sessionStorage, cookie writes)
-    r"\bsessionStorage\b",
-    r"document\.cookie\s*=",
 )
-
-# Conditional pattern: localStorage is permitted ONLY for the glorified_todo
-# archetype (per ANTI_PATTERNS.md rule 12). All other archetypes get the
-# stillborn treatment if localStorage shows up.
-_LOCAL_STORAGE_RE = re.compile(r"\blocalStorage\b")
-_GLORIFIED_TODO = "glorified_todo"
 
 # Compile once at module load.
 _COMPILED_UNIVERSAL: tuple[tuple[re.Pattern[str], str], ...] = tuple(
@@ -88,7 +62,7 @@ class StaticAnalysisResult:
         return f"forbidden pattern {self.pattern!r} matched in {self.file_path}: {self.matched_text!r}"
 
 
-def static_analysis(slot_files: dict[str, str], archetype: str) -> StaticAnalysisResult:
+def static_analysis(slot_files: dict[str, str]) -> StaticAnalysisResult:
     """Scan the slot files for forbidden patterns.
 
     `slot_files` keys are file paths (e.g. 'app/page.tsx', 'lib/data.ts')
@@ -108,16 +82,4 @@ def static_analysis(slot_files: dict[str, str], archetype: str) -> StaticAnalysi
                     matched_text=m.group(0),
                     file_path=path,
                 )
-
-        # Conditional: localStorage only allowed for glorified_todo.
-        if archetype != _GLORIFIED_TODO:
-            m = _LOCAL_STORAGE_RE.search(content)
-            if m:
-                return StaticAnalysisResult(
-                    safe=False,
-                    pattern=r"\blocalStorage\b",
-                    matched_text=m.group(0),
-                    file_path=path,
-                )
-
     return StaticAnalysisResult(safe=True, pattern=None, matched_text=None, file_path=None)
