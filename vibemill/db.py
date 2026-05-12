@@ -98,8 +98,10 @@ class App(SQLModel, table=True):
     synthetic_track: str | None = None       # which hackathon track for synthetic-source apps
     blend_partner_archetype: str | None = None  # secondary archetype if matcher blended
     # Added by migration 010. Bundle H: Python rail via HF Spaces.
-    deploy_target: str | None = None    # 'vercel' | 'hf_spaces'
+    deploy_target: str | None = None    # 'vercel' | 'hf_spaces' | 'github_only' (I)
     hf_space_url: str | None = None     # live URL for HF-deployed apps
+    # Added by migration 011. Bundle I: explicit substrate recording.
+    substrate: str | None = None        # 'nextjs' | 'gradio' | 'flask'
 
 
 class Rejection(SQLModel, table=True):
@@ -263,6 +265,7 @@ def insert_app(record: AppRecord) -> None:
         blend_partner_archetype=record.blend_partner_archetype,
         deploy_target=record.deploy_target,
         hf_space_url=record.hf_space_url,
+        substrate=record.substrate,
     )
     with session() as s:
         s.add(row)

@@ -8,10 +8,13 @@ export type App = {
   github_url: string | null;
   vercel_url: string | null;
   // Bundle H: HF Spaces rail for Python (Gradio) archetypes.
-  // deploy_target is 'vercel' or 'hf_spaces'. Live URL lives in
-  // vercel_url for JS apps, hf_space_url for Python apps.
+  // Bundle I: github_only for Flask apps (no separate live URL —
+  // github_url doubles as the live URL).
+  // deploy_target is 'vercel' | 'hf_spaces' | 'github_only'.
   deploy_target: string | null;
   hf_space_url: string | null;
+  // Bundle I: explicit substrate ('nextjs' | 'gradio' | 'flask').
+  substrate: string | null;
   screenshot_path: string | null;
   source: string;
   source_metadata: Record<string, unknown> | null;
@@ -25,9 +28,12 @@ export type App = {
   retired_at: string | null;
 };
 
-/** The live URL for an app, regardless of which rail deployed it. */
+/** The live URL for an app, regardless of which rail deployed it.
+ *  Bundle I: github_only apps' "live" URL is the GitHub repo itself —
+ *  there is no separate deployment. */
 export function liveUrlOf(app: App): string | null {
   if (app.deploy_target === "hf_spaces") return app.hf_space_url ?? null;
+  if (app.deploy_target === "github_only") return app.github_url ?? null;
   return app.vercel_url ?? null;
 }
 
@@ -44,18 +50,19 @@ export type Rejection = {
 
 const APP_COLUMNS =
   "id, prompt, archetype, layout_archetype, github_url, vercel_url, " +
-  "deploy_target, hf_space_url, screenshot_path, source, source_metadata, " +
-  "status, tier, readme_persona, verifier_verdict, synthetic_track, " +
-  "blend_partner_archetype, created_at, retired_at";
+  "deploy_target, hf_space_url, substrate, screenshot_path, source, " +
+  "source_metadata, status, tier, readme_persona, verifier_verdict, " +
+  "synthetic_track, blend_partner_archetype, created_at, retired_at";
 
-/** Latest live apps with a live URL on either rail, newest first.
- *  Drives the home grid. */
+/** Latest live apps with a live URL on any rail, newest first.
+ *  Bundle I: github_only apps don't have vercel_url or hf_space_url
+ *  but DO have github_url; filter on that disjunction. */
 export async function getLiveApps(limit = 24): Promise<App[]> {
   const { data, error } = await supabase
     .from("apps")
     .select(APP_COLUMNS)
     .eq("status", "live")
-    .or("vercel_url.not.is.null,hf_space_url.not.is.null")
+    .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {

@@ -1,0 +1,85 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a GAME archetype: a small browser-playable
+game where Flask serves an HTML page that loads JS (Canvas or DOM-based)
+gameplay. Examples: Pong, Snake, Tetris-shape-stacker, 2048-style
+combine-tiles, Whack-a-mole, simple platformer, top-down maze runner,
+typing speed test as a game, click-the-target reflex game, 4-in-a-row,
+memory match flip cards, color-shift dodge game, infinite runner. Keep
+it small. One screen of gameplay, optional title and game-over screens.
+
+VISUAL TREATMENT:
+Flask serves templates/index.html which loads static/game.js and
+optionally static/game.css. The gameplay is HTML5 Canvas or DOM
+elements (your choice). Title at top, score / lives / timer below it,
+play area takes most of the screen. Game-over modal or overlay when
+the player loses. The aesthetic can lean retro (pixel font, limited
+palette, 8-bit feel), modern minimal (clean shapes, smooth motion),
+or noisy hackathon (random emojis, bright colors). High-score
+persistence via Flask's session OR a small SQLite table.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as theme/flavor for the game's content. The named-attribution
+constraint applies regardless.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    { "path": "static/game.js", "content": "..." },
+    { "path": "static/game.css", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only): see standard rules. game.js MUST be
+under static/.
+
+FLASK MINIMALISM:
+- Flask's role here is small: serve / (renders the game page) and
+  optionally POST /score to save a high score.
+- All gameplay lives in static/game.js. Pure browser JS — no React,
+  no Vue, no frameworks. Vanilla DOM + Canvas.
+- requestAnimationFrame for the game loop.
+
+DATABASE (tier-driven):
+- slop: no scores saved. Refresh = reset.
+- mean_good: session-based high score (Flask session). Or SQLite high
+  scores table with anonymous entries.
+- banger: SQLite high-score leaderboard with player names entered on
+  game-over. Top 10 shown on the home page.
+
+AUTH: usually none. Banger may have "enter your initials" for the
+leaderboard.
+
+Constraints (hard rules):
+- App must IMPORT without errors. Cross-file imports must resolve.
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- The game's JS must NOT call eval(), Function constructor, or load
+  remote scripts at runtime.
+- No hardcoded API keys.
+- Named-attribution: no fabricated quotes from real people.
+- Audio (optional): if you include sound effects, load from static/
+  via Web Audio API or <audio> tags. No streaming.
+
+Interactivity for GAME:
+**Real game interactivity.** Required: keyboard / mouse / touch input
+controls a player or game object. Game state advances each frame (or
+each turn). Score increments. Loss / win condition triggers a game-over
+state. Restart button or key brings the player back to the start. The
+game must be PLAYABLE end-to-end (no "TODO: implement collision").
+
+Output the JSON object only. No prose before or after.

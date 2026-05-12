@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 # values mirror the deploy_target column in apps (migration 010).
 DEPLOY_TARGET_VERCEL = "vercel"
 DEPLOY_TARGET_HF_SPACES = "hf_spaces"
+DEPLOY_TARGET_GITHUB_ONLY = "github_only"  # Bundle I: Flask apps, repo-only
 
 
 @dataclass
@@ -42,9 +43,10 @@ class DeployOutcome:
 
 
 def substrate_for(archetype: str) -> str:
-    """Return 'js' or 'python' for an archetype, defaulting to 'js' for
-    archetypes that haven't been classified yet."""
-    return SUBSTRATE_BY_ARCHETYPE.get(archetype, "js")
+    """Return the stack name ('nextjs' | 'gradio' | 'flask') for an
+    archetype, defaulting to 'nextjs' for archetypes that haven't been
+    classified yet."""
+    return SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs")
 
 
 def deploy(
@@ -54,12 +56,16 @@ def deploy(
     src_dir: Path,
     repo_id: int,
     commit_sha: str,
+    github_url: str,
 ) -> DeployOutcome:
     """Dispatch to the right deploy backend. Blocks until the deploy is
     READY/RUNNING. Raises on terminal failure (caller marks app stillborn).
+
+    `github_url` is the canonical source URL; for github_only apps it
+    doubles as the live URL since there is no separate deployment.
     """
-    substrate = substrate_for(archetype)
-    if substrate == "python":
+    stack = substrate_for(archetype)
+    if stack == "gradio":
         # HF Spaces: create + force-push from src_dir (already has the
         # vibecoder commit history from github_publish), then wait.
         hf_spaces_deploy.create_and_push(name=name, src=src_dir)
@@ -68,6 +74,16 @@ def deploy(
         return DeployOutcome(
             deploy_target=DEPLOY_TARGET_HF_SPACES,
             public_url=result.public_url,
+            project_name=name,
+        )
+
+    if stack == "flask":
+        # Bundle I: repo-only. The GitHub push that already happened IS the
+        # deploy. No third-party deployment, no health-check, no waiting.
+        log.info("deploy %s: github_only (no third-party deploy)", name)
+        return DeployOutcome(
+            deploy_target=DEPLOY_TARGET_GITHUB_ONLY,
+            public_url=github_url,
             project_name=name,
         )
 

@@ -69,21 +69,45 @@ JS_RULES = SubstrateRules(
     chassis_owned=frozenset({"app/layout.tsx", "app/globals.css"}),
 )
 
-PYTHON_RULES = SubstrateRules(
+# Bundle H: Gradio apps on HF Spaces. Top-level .py files only; the
+# chassis README has HF Spaces YAML frontmatter pinning python_version,
+# sdk_version, app_file.
+GRADIO_RULES = SubstrateRules(
     required_path="app.py",
-    allowed_path_prefixes=(),  # top-level files only for the Gradio shape
+    allowed_path_prefixes=(),
     allowed_extensions=(".py",),
-    # The LLM produces requirements.txt with the gradio pin + any extra deps.
     allowed_basenames=frozenset({"requirements.txt"}),
-    # README.md carries HF Spaces metadata (sdk, python_version, etc.) which
-    # is load-bearing per the Bundle H test findings. Chassis pins it.
     chassis_owned=frozenset({"README.md", ".gitignore"}),
 )
 
+# Bundle I: Flask apps that live as GitHub repos (deploy_target=github_only).
+# Allowed structure: app.py, templates/*.html, static/{css,js,...}, optional
+# top-level helper .py files. README.md is LLM-produced (no HF frontmatter),
+# .gitignore is chassis-owned, .env.example is LLM-produced (placeholder
+# values for OAuth client_id/client_secret, DB URLs, etc.).
+FLASK_RULES = SubstrateRules(
+    required_path="app.py",
+    allowed_path_prefixes=("templates/", "static/"),
+    allowed_extensions=(".py", ".html", ".css", ".js"),
+    allowed_basenames=frozenset({
+        "requirements.txt", ".env.example", "Dockerfile", "docker-compose.yml",
+    }),
+    # .gitignore is chassis-pinned (Python ignore patterns); the LLM
+    # produces README.md (the persona-driven setup-steps narrative).
+    chassis_owned=frozenset({".gitignore"}),
+)
+
+# Back-compat alias. Pre-Bundle-I code referenced PYTHON_RULES when it
+# meant "Gradio rules." Keep the alias so external references don't break.
+PYTHON_RULES = GRADIO_RULES
+
 
 def _rules_for(archetype: str) -> SubstrateRules:
-    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
-        return PYTHON_RULES
+    stack = SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs")
+    if stack == "gradio":
+        return GRADIO_RULES
+    if stack == "flask":
+        return FLASK_RULES
     return JS_RULES
 
 
@@ -347,7 +371,7 @@ def generate(
     log.info(
         "generator prompt: model=%s reasoning=%s archetype=%s substrate=%s layout=%s tier=%s blend=%s chars=%d",
         model.slug, model.reasoning_effort, archetype,
-        SUBSTRATE_BY_ARCHETYPE.get(archetype, "js"),
+        SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs"),
         layout, tier, blend_partner, len(user_prompt),
     )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)

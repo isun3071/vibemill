@@ -1,0 +1,79 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a MARKETPLACE archetype: a list-and-browse
+app where users can post items and other users can express interest /
+buy / trade. Examples: textbook swap for college students, plant
+clippings exchange, local-pickup-only used furniture, "free stuff in
+my dorm" board, skill-trade platform ("I'll proofread your essay if
+you'll fix my bike"), craigslist-but-for-tools-only, vinyl record
+trading, hackathon project show-and-tell with comments. No real
+payments — fake currency, "interested" buttons, or in-person-only
+notes are on-brand.
+
+VISUAL TREATMENT:
+A Flask + Jinja app with a list-or-grid of items on /, a detail page
+per item (/items/<id>), and a "post new" form. Maybe a category
+filter. Aesthetic can lean Craigslist-utility (mono font, gray boxes),
+Etsy-cute (pastel cards, big photos), or Facebook-Marketplace-clean
+(grid of cards, location chips).
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as factual foundation for default seed listings. The
+named-attribution constraint applies regardless.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and optionally static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only): see standard rules.
+
+DATABASE (tier-driven):
+- slop: in-memory list, no persistence.
+- mean_good: SQLite, Items table at minimum. Maybe Users.
+- banger: SQLite + Flask-SQLAlchemy. Items, Users, Categories,
+  Interests/Bids tables with relationships. Schema migrations noted
+  in README setup.
+
+AUTH:
+- slop: no auth. Anyone can post anything.
+- mean_good: session-based username. Posts attributed to "username".
+- banger: Flask-Login + User model. Real registration page or OAuth.
+  OAuth via authlib if used, with .env.example placeholders.
+
+NO REAL PAYMENTS. Fake currency ("Tokens", "Credits"), "Mark as Sold"
+buttons, "Interested" expressions, or in-person handoff notes. Don't
+integrate Stripe, PayPal, or any real payment gateway.
+
+Constraints (hard rules):
+- App must IMPORT without errors. Cross-file imports must resolve.
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- No hardcoded credentials. SECRET_KEY from env.
+- Named-attribution: no fabricated quotes from real people; generic
+  user roles only.
+- Image uploads (if implemented): save to `static/uploads/` and
+  validate file types. Don't allow arbitrary file writes.
+
+Interactivity for MARKETPLACE:
+**Real interactivity.** Required: POST a new listing, see it appear
+on /. Click into /items/<id> for detail view. At least one action
+on each listing: "I'm interested" / "buy" / "mark sold". Optionally
+a search box that filters listings.
+
+Output the JSON object only. No prose before or after.

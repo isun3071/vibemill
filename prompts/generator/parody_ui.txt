@@ -1,0 +1,88 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a PARODY UI archetype: a knowingly-cliched
+clone, parody, or "X but for Y" app where the entire premise is a
+recognizable bit. Examples: Twitter but for cats, LinkedIn for plants,
+Tinder for textbooks, Yelp for haunted houses, Hacker News but only
+for medieval news, Reddit for ghosts, Goodreads for taking notes on
+your dreams, Etsy for things you can't physically own. The bit is the
+product.
+
+VISUAL TREATMENT:
+A Flask + Jinja app that visibly imitates the target service's UI
+shorthand: blue palette + bird iconography for a Twitter parody;
+navy + suit-and-tie energy for LinkedIn; swipe-card layout for
+Tinder; star ratings + map pins for Yelp. The imitation is recognizable
+but obviously a hackathon take, not a polished clone. Visual humor
+welcome.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as factual foundation for default seed entries. The
+named-attribution constraint applies regardless.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and optionally static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only):
+- "app.py" REQUIRED at top level.
+- "requirements.txt" REQUIRED at top level. Pin flask>=3.0,<4 first.
+- "templates/<name>.html" for Jinja templates.
+- "static/<name>.css" or ".js" for static assets.
+- Top-level helper .py files allowed.
+- ".env.example" at top level documenting any required env vars.
+- No README.md (persona writer handles it).
+
+DATABASE (tier-driven):
+- slop: in-memory Python dict. Seed data hardcoded.
+- mean_good: SQLite, your choice. Posts/listings/users persist.
+- banger: SQLite with Flask-SQLAlchemy, proper models, schema migrations
+  noted in README setup steps.
+
+AUTH:
+- slop: no auth.
+- mean_good: optional session-based "what's your username" page.
+- banger: Flask-Login with User model. OAuth optional.
+
+Genre constraints:
+- The parody MUST be recognizable as a parody, not a sincere clone.
+  Headers like "Bark!", "PetIn", "BookMatch" make the joke explicit.
+- The footer disclaimer in the README acknowledges the parody.
+- Do NOT use real company names in the database/UI (no "real Twitter
+  users posted this"). The bit is the form, not the data.
+
+Constraints (hard rules):
+- The app must IMPORT without errors.
+- Cross-file imports must resolve (see PATH RULES).
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- No hardcoded credentials. SECRET_KEY from env.
+- API keys (if any) from os.environ.
+- Named-attribution constraint:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Generic identities only ("a user", "a customer")
+
+Interactivity for PARODY UI:
+**Real interactivity.** Required: POST a new post / listing / match /
+review and have it re-render in the feed. Like / heart / upvote buttons
+that update counts. Empty state with a witty placeholder when the
+service is brand new. At least one navigational page beyond /
+(e.g. /profile/<username>, /post/<id>, /search).
+
+Output the JSON object only. No prose before or after.

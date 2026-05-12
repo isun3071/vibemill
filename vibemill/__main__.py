@@ -286,11 +286,31 @@ def _run_python_check(work: Path) -> tuple[bool, str]:
     return True, "python build checks pass"
 
 
+def _run_flask_check(work: Path) -> tuple[bool, str]:
+    """Bundle I: build proxy for Flask + github_only apps. Same ast.parse
+    + cross-file imports pass as the Gradio path (Python is Python), with
+    one extra check: verify the chassis-required files are present
+    (.gitignore is chassis-owned; the LLM produces README + .env.example
+    + requirements.txt + app.py).
+
+    No third-party deploy here; the GitHub repo IS the artifact. Real
+    install + runtime-import validation never happens on the mill's side
+    (that's the user's problem if they try to clone and run).
+    """
+    return _run_python_check(work)
+
+
 def _run_build_check(work: Path, archetype: str) -> tuple[bool, str]:
-    """Dispatch to the build check for the archetype's substrate. JS
-    archetypes get `next build`; Python archetypes get the ast-parse proxy."""
-    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+    """Dispatch the build check for the archetype's stack.
+      nextjs -> next build
+      gradio -> ast.parse + cross-file imports
+      flask  -> ast.parse + cross-file imports (same Python checks)
+    """
+    stack = SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs")
+    if stack == "gradio":
         return _run_python_check(work)
+    if stack == "flask":
+        return _run_flask_check(work)
     return _run_next_build(work)
 
 
@@ -671,6 +691,7 @@ def _ship_one(
             src_dir=work,
             repo_id=publish_result.repo_id,
             commit_sha=publish_result.last_commit_sha,
+            github_url=publish_result.html_url,
         )
     except Exception as exc:
         log.error("%s: deploy failed: %s", app_id, exc)
@@ -683,9 +704,11 @@ def _ship_one(
             log.warning("%s: github archive after deploy failure also failed: %s", app_id, exc2)
         # Bundle H: clean up the HF Space too if we got far enough to create
         # one. create_and_push happens BEFORE wait_for_url, so a deploy
-        # failure on the Python rail (e.g. RUNTIME_ERROR) leaves a broken
-        # Space sitting in the namespace. Delete it.
-        if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+        # failure on the Gradio rail (e.g. RUNTIME_ERROR) leaves a broken
+        # Space sitting in the namespace. Delete it. Flask + github_only
+        # apps have no third-party deploy; the github archive above is the
+        # only cleanup needed.
+        if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "gradio":
             try:
                 from .clients import hf_spaces
                 hf_spaces.delete_space(app_id)
@@ -714,11 +737,12 @@ def _ship_one(
             layout_archetype=layout,
             synthetic_track=synthetic_track,
             blend_partner_archetype=blend_partner,
-            deploy_target=(
-                deploy.DEPLOY_TARGET_HF_SPACES
-                if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python"
+            deploy_target=deploy.substrate_for(archetype) and (
+                deploy.DEPLOY_TARGET_HF_SPACES if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "gradio"
+                else deploy.DEPLOY_TARGET_GITHUB_ONLY if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "flask"
                 else deploy.DEPLOY_TARGET_VERCEL
             ),
+            substrate=SUBSTRATE_BY_ARCHETYPE.get(archetype),
         ))
         audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
@@ -736,19 +760,19 @@ def _ship_one(
 
     elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
 
-    # 7. Insert the final app row
-    is_python = deploy_outcome.deploy_target == deploy.DEPLOY_TARGET_HF_SPACES
+    # 7. Insert the final app row. vercel_url / hf_space_url are exclusive:
+    # only the deploy backend that actually ran populates its URL field.
+    # github_only apps set neither — the live URL is github_url itself.
+    target = deploy_outcome.deploy_target
     db.insert_app(AppRecord(
         id=app_id, prompt=prompt, archetype=archetype,
         archetype_score=m.scores.as_dict()[archetype],
         tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
         github_url=publish_result.html_url,
-        # vercel_url and hf_space_url are exclusive: one is set, the other
-        # is None, based on which deploy backend ran. The public site picks
-        # the right one by reading deploy_target.
-        vercel_url=None if is_python else deploy_outcome.public_url,
-        hf_space_url=deploy_outcome.public_url if is_python else None,
-        deploy_target=deploy_outcome.deploy_target,
+        vercel_url=deploy_outcome.public_url if target == deploy.DEPLOY_TARGET_VERCEL else None,
+        hf_space_url=deploy_outcome.public_url if target == deploy.DEPLOY_TARGET_HF_SPACES else None,
+        deploy_target=target,
+        substrate=SUBSTRATE_BY_ARCHETYPE.get(archetype),
         screenshot_path=screenshot_path,
         screenshot_status=screenshot_status,
         generation_seconds=elapsed,

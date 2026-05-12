@@ -19,8 +19,8 @@ function formatTime(iso: string): string {
 }
 
 function archetypeLabel(app: App): string {
-  // Show layout for trackers; tag HF Spaces apps so the rail is visible
-  // at a glance. Vercel/JS apps are the default; no tag needed.
+  // Show layout for trackers; tag the rail when it's not Vercel/JS
+  // (the default). hf = HF Spaces (Gradio); repo = github_only (Flask).
   const parts: string[] = [];
   if (app.archetype === "tracker" && app.layout_archetype) {
     parts.push("tracker", app.layout_archetype);
@@ -28,6 +28,7 @@ function archetypeLabel(app: App): string {
     parts.push(app.archetype);
   }
   if (app.deploy_target === "hf_spaces") parts.push("hf");
+  else if (app.deploy_target === "github_only") parts.push("repo");
   return parts.join(" · ");
 }
 

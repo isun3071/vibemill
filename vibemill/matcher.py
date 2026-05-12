@@ -51,8 +51,18 @@ _V0_BUILDABLE: frozenset[str] = frozenset({
     "chatbot",
     "utility_tool",
     "search_directory",
-    "ai_generator",   # Bundle H: Gradio + HF Spaces
-    "ai_agent",       # Bundle H: Gradio + HF Spaces
+    "ai_generator",     # Bundle H: Gradio + HF Spaces
+    "ai_agent",         # Bundle H: Gradio + HF Spaces
+    # Bundle I: Flask + github_only. Repo-only deploy; the GitHub repo IS
+    # the artifact. Database + auth + file storage allowed in code (the
+    # mill never collects real user data because the app never runs).
+    "glorified_todo",
+    "parody_ui",
+    "marketplace",
+    "map_visualizer",
+    "recommendation_engine",
+    "game",
+    "glorified_social",
 })
 
 # Public alias for tooling that wants to know what's buildable today

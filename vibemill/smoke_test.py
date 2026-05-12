@@ -144,13 +144,15 @@ def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
 
 
 def _build(work: Path, archetype: str) -> tuple[bool, str]:
-    """Substrate-aware build proxy. JS: npm install + next build.
-    Python (Bundle H): ast.parse + cross-file import resolution. Real
-    pip install + runtime import validation happens at HF deploy time,
-    which smoke skips. We reuse __main__'s helpers for parity so smoke
-    and the real pipeline can't drift."""
+    """Substrate-aware build proxy. nextjs: npm install + next build.
+    gradio / flask: ast.parse + cross-file import resolution (Python is
+    Python). Real install + runtime-import validation happens at deploy
+    time (HF Spaces for gradio, never for flask/github_only); smoke skips
+    both. Reuses __main__'s helpers so smoke and the real pipeline can't
+    drift."""
     from .models import SUBSTRATE_BY_ARCHETYPE
-    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+    stack = SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs")
+    if stack in ("gradio", "flask"):
         from .__main__ import _run_python_check
         return _run_python_check(work)
 

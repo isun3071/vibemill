@@ -42,27 +42,43 @@ ARCHETYPE_NAMES: tuple[str, ...] = (
     "parody_ui",
 )
 
-# Bundle H: which substrate (language + deploy target) each archetype uses.
-# 'js' archetypes are Next.js apps on Vercel; 'python' archetypes are Gradio
-# apps on HF Spaces. Stubs not yet lit up are listed with their intended
-# substrate so future bundles know where they're routed. Adding an archetype
-# to the matcher's buildable set without also setting its substrate here is
-# a bug; the generator dispatches off this map.
+# Which stack each archetype uses. The stack determines language (for
+# generator file rules + static analysis + build check), chassis directory,
+# and deploy target.
+#
+# Bundle F: tracker/chatbot/utility_tool/search_directory on nextjs/vercel
+# Bundle H: ai_generator/ai_agent on gradio/hf_spaces
+# Bundle I: the 7 previously-stubbed archetypes on flask/github_only
 SUBSTRATE_BY_ARCHETYPE: dict[str, str] = {
-    "tracker": "js",
-    "chatbot": "js",
-    "utility_tool": "js",
-    "search_directory": "js",
-    "ai_generator": "python",  # Bundle H
-    "ai_agent": "python",      # Bundle H
-    "game": "js",
-    "glorified_todo": "js",
-    "glorified_social": "js",
-    "recommendation_engine": "js",
-    "marketplace": "js",
-    "map_visualizer": "js",
-    "parody_ui": "js",
+    "tracker": "nextjs",
+    "chatbot": "nextjs",
+    "utility_tool": "nextjs",
+    "search_directory": "nextjs",
+    "ai_generator": "gradio",
+    "ai_agent": "gradio",
+    "glorified_todo": "flask",
+    "parody_ui": "flask",
+    "marketplace": "flask",
+    "map_visualizer": "flask",
+    "recommendation_engine": "flask",
+    "game": "flask",
+    "glorified_social": "flask",
 }
+
+
+def language_for(stack: str) -> str:
+    """Source language for a stack. 'js' for nextjs, 'python' for gradio/flask.
+    Used by static analysis and build-check dispatch."""
+    return "js" if stack == "nextjs" else "python"
+
+
+def deploy_target_for(stack: str) -> str:
+    """The deploy_target column value for a given stack."""
+    return {
+        "nextjs": "vercel",
+        "gradio": "hf_spaces",
+        "flask": "github_only",
+    }.get(stack, "vercel")
 
 ArchetypeName = Literal[
     "tracker",
@@ -237,12 +253,16 @@ class AppRecord(BaseModel):
     synthetic_track: str | None = None
     blend_partner_archetype: str | None = None
     # Migration 010: Bundle H Python rail via HF Spaces.
-    # deploy_target is 'vercel' for Next.js apps, 'hf_spaces' for Gradio apps.
-    # hf_space_url holds the live URL for HF-deployed apps; vercel_url still
-    # holds it for Vercel-deployed apps. The public site picks the right one
-    # based on deploy_target.
+    # deploy_target is 'vercel' for Next.js apps, 'hf_spaces' for Gradio apps,
+    # or 'github_only' (Bundle I) for Flask + repo-only apps. hf_space_url
+    # holds the live URL for HF-deployed apps; vercel_url for Vercel; both
+    # are None for github_only (live URL == github_url). The public site
+    # picks the right one based on deploy_target.
     deploy_target: str | None = None
     hf_space_url: str | None = None
+    # Migration 011: Bundle I explicit substrate recording. One of
+    # 'nextjs' | 'gradio' | 'flask'. Records the stack the LLM produced.
+    substrate: str | None = None
 
 
 class RejectionRecord(BaseModel):

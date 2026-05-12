@@ -1,0 +1,103 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a GLORIFIED TODO archetype: a souped-up
+todo / task / checklist / habit-tracker app that adds one or two
+"creative" features on top of the basic CRUD shape. Examples:
+todo with deadlines and emoji moods, habit tracker with streaks,
+study-task manager with Pomodoro timer, grocery list with category
+auto-tagging, "things I should do before I die" bucket list,
+reading-list tracker with progress percentage, recipe-prep checklist,
+gym workout logger, daily-journal-plus-todo hybrid.
+
+VISUAL TREATMENT:
+A Flask app serving Jinja templates. One main page listing items
+(table or card grid), a small form for adding items at top or via
+modal, edit/delete buttons inline, maybe a filter or sort dropdown.
+Login page if auth is included. The aesthetic can lean utilitarian
+(Bootstrap defaults), playful (custom CSS with bright accents), or
+minimal-monochrome. Pick a single visual direction and execute it.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as factual foundation for default example items. The
+named-attribution constraint applies regardless.
+
+A chassis provides .gitignore. You produce everything else:
+README.md, .env.example, requirements.txt, app.py, templates/, and
+optionally static/. The README's setup steps are part of the
+artifact (the readme_writer prompt covers the prose; you produce
+the runnable code).
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only):
+- "app.py" is REQUIRED at the top level. Flask entry point.
+- "requirements.txt" is REQUIRED at the top level. Pin flask>=3.0,<4 as
+  the first line. Add other deps (flask-login, flask-sqlalchemy, etc.) as
+  needed.
+- "templates/<name>.html" for Jinja templates.
+- "static/<name>.css" or "static/<name>.js" for static assets.
+- Top-level helper .py files allowed (models.py, auth.py, forms.py, etc.).
+- ".env.example" at the top level documenting required env vars.
+- No README.md (the persona writer handles that).
+
+DATABASE (tier-driven):
+- slop: no database. Store items in a Python list or dict in memory.
+  Data is lost on restart. On-brand for the laziest tier.
+- mean_good: SQLite, your choice. Either `sqlite3` directly or
+  Flask-SQLAlchemy with a single Model class. Stored in a local file.
+- banger: SQLite with proper schema. Use Flask-SQLAlchemy + Flask-Migrate
+  (or a one-shot `db.create_all()` init). Define explicit models with
+  proper types and relationships. README setup steps include the init
+  command.
+
+AUTH:
+- slop: no auth at all. Anyone can use the app.
+- mean_good: optional. If included, use Flask-Login with a hardcoded
+  demo user, or session-cookie based "name your user" page (no real auth).
+- banger: real auth via Flask-Login with a User model. May include
+  Google OAuth via authlib. If OAuth: .env.example MUST have
+  GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET as placeholder
+  values like "paste-your-google-oauth-client-id-here". README setup
+  must include the Google Cloud setup steps.
+
+Constraints (hard rules):
+- The app must IMPORT without errors. Syntax errors fail the static check.
+- If you split into multiple .py files: every `from <module> import <name>`
+  to a SIBLING file MUST resolve. Missing cross-file names fail the
+  static check.
+- Top-level `app = Flask(__name__)` and an `if __name__ == "__main__": app.run()`
+  block at the bottom.
+- No hardcoded credentials. SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
+  is the typical pattern (insecure default for local dev is on-brand).
+- API keys (if any) read from os.environ, not literals.
+- When the app references quotes, statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Do NOT fabricate specific bill numbers, case numbers, dollar amounts
+    attributed to real people or named institutions
+  - Generic role references are fine ("a user", "a friend")
+
+Interactivity for GLORIFIED TODO:
+**Real Flask interactivity, not a static page.** Required: POST /items
+or similar creates a new item; the page re-renders showing the new item.
+At least one of: delete via POST /items/<id>/delete, edit via form, mark
+complete via toggle. The "creative" feature (mood emoji, streak, Pomodoro,
+category auto-tag) actually does its thing on the data, not just sits as
+unused chrome.
+
+Output the JSON object only. No prose before or after.

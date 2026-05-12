@@ -1,0 +1,87 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a GLORIFIED SOCIAL archetype: a
+single-purpose mini social-network where users can post, comment,
+and react around ONE specific theme. Examples: a forum for college
+food reviews, a confession board for one specific class, a tiny
+Twitter-but-just-about-dogs, a community of vinyl trade reviewers,
+"my workout today" daily check-in feed, a knit-pattern-sharing forum,
+study-spot reviews for one campus, gardening-fail support group,
+plant-watering reminder community. The narrow theme is the feature.
+
+VISUAL TREATMENT:
+Flask + Jinja with a feed on / (chronological list of posts), each
+post showing author + content + a few reactions + comments count.
+Click a post -> /posts/<id> shows the post + threaded comments.
+Post-new form at the top of / or as a separate page. Login page if
+auth is included. Aesthetic ranges from minimal-Reddit (mono font,
+dark/light theme, threaded indentation) to colorful (kawaii icons,
+playful colors) to corporate-LinkedIn-parody.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+use it for theme / seed posts. Named-attribution constraint applies.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and optionally static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/feed.html", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only): see standard rules.
+
+DATABASE (tier-driven):
+- slop: in-memory list of posts. Refresh resets feed.
+- mean_good: SQLite for posts. Optional comments table.
+- banger: SQLite via Flask-SQLAlchemy. Users, Posts, Comments,
+  Reactions tables with proper relationships. Migrations or
+  db.create_all() in README setup steps.
+
+AUTH:
+- slop: no auth. Posts attributed to "Anonymous."
+- mean_good: session-based "what's your username" page. Posts
+  attributed to whatever the user typed.
+- banger: Flask-Login with User model + registration page. OAuth
+  via authlib optional, with .env.example placeholders for Google
+  client_id / client_secret. README setup includes the Google
+  Cloud OAuth steps.
+
+MODERATION:
+- The mill does not collect real user content (app is repo-only, never
+  runs on the mill's infrastructure). But IF someone clones and runs
+  this, posts they accept are their responsibility.
+- Include a simple word-blocklist filter (banger only) that drops a
+  post if it contains slurs from a hardcoded short list.
+- README explicitly notes: "you are responsible for moderation if you
+  run this publicly."
+
+Constraints (hard rules):
+- App must IMPORT without errors. Cross-file imports must resolve.
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- No hardcoded credentials. SECRET_KEY from env.
+- No hardcoded API keys.
+- Named-attribution: no fabricated quotes from real people; seed posts
+  use generic usernames ("user42", "study_buddy").
+
+Interactivity for GLORIFIED SOCIAL:
+**Real interactivity.** Required: post a new entry -> see it in the
+feed. Click into a post -> see its detail page with comments. POST a
+new comment -> see it appended. At least one reaction (like / upvote /
+heart) per post that increments a counter. Optionally: pagination,
+search, tags, edit-own-post.
+
+Output the JSON object only. No prose before or after.

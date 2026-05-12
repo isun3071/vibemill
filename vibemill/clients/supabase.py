@@ -234,6 +234,21 @@ def assert_deploy_target_columns() -> None:
     )
 
 
+def assert_substrate_column() -> None:
+    """Verify migration 011 (substrate text) has been applied to the
+    Supabase apps table. Bundle I: Flask substrate + github_only."""
+    url = f"{_base()}/rest/v1/apps?select=substrate&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 011 (substrate) is missing on the Supabase apps table. "
+        f"HTTP {r.status_code}: {r.text[:200]}. Apply "
+        "migrations/supabase/011_add_substrate_column.sql manually in the "
+        "Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 # so the LLM doesn't default to Next.js / npm boilerplate for Python apps.
 # The persona templates themselves still mention Next.js; this override
 # wins because it's later in the prompt and more specific.
-_PYTHON_SUBSTRATE_PREFACE = (
+_GRADIO_SUBSTRATE_PREFACE = (
     "SUBSTRATE OVERRIDE (Bundle H):\n"
     "This app is a Python Gradio app deployed on Hugging Face Spaces - "
     "NOT a Next.js / TypeScript / Tailwind app. Adapt the README accordingly:\n"
@@ -58,6 +58,40 @@ _PYTHON_SUBSTRATE_PREFACE = (
     "output; your content goes AFTER the existing frontmatter.\n"
     "- The voice and section structure described below still apply; "
     "swap the substrate details only.\n\n"
+)
+
+# Bundle I: Flask + github_only. The app lives as a GitHub repo with no
+# live deploy; the README must include real, runnable setup steps that
+# walk the reader through cloning, installing, configuring secrets, and
+# running locally. Some steps may be partially-broken (on-brand), but
+# the README must NOT lie about features the code lacks.
+_FLASK_SUBSTRATE_PREFACE = (
+    "SUBSTRATE OVERRIDE (Bundle I):\n"
+    "This app is a Python Flask app that lives as a GitHub repo only - "
+    "no Vercel, no HF Spaces, NOT a Next.js app. Adapt the README:\n"
+    "- Tech stack: Python, Flask, Jinja templates, plus whichever DB / "
+    "auth libraries the app uses (sqlite3, SQLAlchemy, Flask-Login, "
+    "authlib, etc.). Do NOT mention Next.js, TypeScript, Tailwind, React, "
+    "or npm.\n"
+    "- Include a complete, runnable SETUP section: clone, python -m venv, "
+    "source activate, pip install -r requirements.txt, copy .env.example "
+    "to .env and fill in placeholders, any DB-init steps (e.g. "
+    "`flask db upgrade` or `python -c \"from app import db; db.create_all()\"`), "
+    "then `flask run` or `python app.py`.\n"
+    "- If the app uses Google OAuth or similar: include the steps to "
+    "create a Google Cloud project, enable the relevant APIs, generate "
+    "OAuth 2.0 credentials, and paste client_id + client_secret into "
+    ".env. Hackathon-authentic step-count is fine (5-10 steps).\n"
+    "- If the app uses a Postgres or Mongo container: include a "
+    "`docker-compose up -d` step before the migrations.\n"
+    "- Hackathon-cliche details encouraged: 'Tested on macOS Sonoma + "
+    "Python 3.11', 'YMMV on Windows', 'Note: the OAuth flow doesn't "
+    "work in incognito mode for some reason, idk.'\n"
+    "- The README must NOT claim features the code doesn't actually "
+    "include. Steps that don't work because of code bugs are on-brand; "
+    "boasting about features that aren't in the codebase is not.\n"
+    "- DO NOT mention deployment to Heroku, Vercel, Railway, etc. This "
+    "is intentionally a clone-and-run project.\n\n"
 )
 
 # (persona_name, weight). Weights must sum to 1.0.
@@ -146,15 +180,17 @@ def write(
         archetype=archetype,
         source_headline=source_headline,
     )
-    # Bundle H: prepend the Python substrate override after the persona
-    # template so the LLM swaps Next.js/npm specifics for Gradio/pip ones.
-    # The persona's voice and section structure are still followed.
-    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
-        user_prompt = user_prompt + "\n\n" + _PYTHON_SUBSTRATE_PREFACE
+    # Bundle H/I: append the substrate override so the LLM swaps Next.js/npm
+    # specifics for the right stack. Persona voice and section structure
+    # are still followed.
+    stack = SUBSTRATE_BY_ARCHETYPE.get(archetype, "nextjs")
+    if stack == "gradio":
+        user_prompt = user_prompt + "\n\n" + _GRADIO_SUBSTRATE_PREFACE
+    elif stack == "flask":
+        user_prompt = user_prompt + "\n\n" + _FLASK_SUBSTRATE_PREFACE
     log.info(
         "readme prompt: model=%s persona=%s app_name=%s substrate=%s chars=%d",
-        model.slug, persona, app_name,
-        SUBSTRATE_BY_ARCHETYPE.get(archetype, "js"), len(user_prompt),
+        model.slug, persona, app_name, stack, len(user_prompt),
     )
     completion = openrouter.complete(
         model=model.slug,

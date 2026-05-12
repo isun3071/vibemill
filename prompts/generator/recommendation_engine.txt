@@ -1,0 +1,88 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a RECOMMENDATION ENGINE archetype: a Flask
+app that takes a user's preferences or current input and returns a
+ranked list of items "you might like." Examples: movie recommendations
+based on three favorites, book picks by genre + mood, restaurant
+matcher by cuisine and price, hackathon-project ideas by interest tags,
+playlist suggestions by mood, college-class recommender by major,
+study-buddy matcher by subject, recipe suggestions by ingredients
+on hand, gift ideas by recipient personality, video game picks by
+preferred mechanics.
+
+VISUAL TREATMENT:
+A Flask + Jinja app with an input form on / (multi-select tags, text
+prompt, or sliders), a "Recommend" button, and a results list below
+showing 3-10 ranked items with a short explanation for each ("you
+might like X because you liked Y"). Cards with title + short blurb +
+score. Optional: "tell me more" expandable details, "thumbs up / down"
+feedback that adjusts future recommendations.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as factual foundation for the seed catalog. The
+named-attribution constraint applies regardless.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and optionally static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only): see standard rules.
+
+RECOMMENDATION ALGORITHM (tier-driven):
+- slop: simple keyword overlap. If user picks 'sci-fi' and 'space',
+  score items by how many of those words appear in the item's tags.
+- mean_good: cosine similarity over TF-IDF (use scikit-learn or
+  implement TF-IDF by hand in helpers.py). The catalog is hardcoded
+  in lib/catalog.py or loaded from a JSON in static/.
+- banger: TF-IDF + thumbs-up feedback loop. User likes / dislikes
+  adjust an in-memory weight vector. Optional: LLM-based "explain why"
+  if OPENAI_API_KEY is set in .env (BYOK pattern); fall back to
+  template explanations if not.
+
+DATABASE:
+- slop: hardcoded catalog, no DB.
+- mean_good: SQLite for the catalog. Items table.
+- banger: SQLite for catalog + user feedback. Items + Feedback tables.
+
+AUTH:
+- Usually no auth. Recommendations are typically anonymous.
+- banger may add session-based "your taste profile" persistence.
+
+BRING-YOUR-OWN-KEY (banger optional):
+If the banger tier uses LLM-based explanations:
+- Read OPENAI_API_KEY from os.environ at call time
+- Fall back to template explanations if missing
+- README setup includes "optional: set OPENAI_API_KEY in .env"
+
+Constraints (hard rules):
+- App must IMPORT without errors. Cross-file imports must resolve.
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- No hardcoded API keys.
+- Named-attribution: no fabricated quotes from real people; generic
+  reviewers ("a happy user", "a critic").
+
+Interactivity for RECOMMENDATION ENGINE:
+**Real interactivity.** Required: form submission triggers the
+recommendation function and renders the ranked list. Each result
+includes an explanation. At least one of: thumbs feedback that
+updates ranking, "regenerate" button with shuffled input, save-list
+feature.
+
+Output the JSON object only. No prose before or after.

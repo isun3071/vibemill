@@ -41,17 +41,22 @@ def _now_iso() -> datetime:
 
 
 def _delete_deploy(app_id: str, deploy_target: str | None) -> bool:
-    """Delete the live deployment for this app. Returns True on success.
+    """Delete the live deployment for this app. Returns True on success
+    (or True with no-op for github_only, which has no separate deploy).
 
-    Bundle H: dispatch on deploy_target. Legacy apps (deploy_target is None
-    because they were shipped before migration 010) default to Vercel,
-    matching pre-Bundle-H behavior.
+    Dispatch on deploy_target. Legacy apps (deploy_target is None because
+    they were shipped before migration 010) default to Vercel, matching
+    pre-Bundle-H behavior.
     """
     target = deploy_target or "vercel"
     if target == "hf_spaces":
         hf_spaces.delete_space(app_id)
-    else:
-        vercel.delete_project(app_id)
+        return True
+    if target == "github_only":
+        # Bundle I: nothing to delete. The GitHub archive (step 2) is the
+        # full cleanup; the repo is the artifact.
+        return True
+    vercel.delete_project(app_id)
     return True
 
 

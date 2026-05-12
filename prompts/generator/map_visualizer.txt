@@ -1,0 +1,81 @@
+You are generating a Python Flask app that lives as a GitHub repo only
+(no live deploy). This is a MAP VISUALIZER archetype: a Flask app that
+serves a single page with an interactive map showing data points. The
+map is the centerpiece; everything else is a list, filter, or detail
+panel. Examples: campus dining map with hours and busy-ness, hiking
+trail spotting board, public art locator, "best bathroom on campus"
+crowdsourced map, lost-and-found pin board, free wifi map, parking
+spots that don't get tickets, where I parked my car log, local
+farmers' markets schedule.
+
+VISUAL TREATMENT:
+Flask + Jinja, with the main page including a Leaflet.js map (loaded
+from CDN) and a sidebar / overlay list of points. Click a point on the
+map -> highlight in list, or vice versa. Optional filters (categories,
+date range, distance). Use OpenStreetMap tiles as the default basemap
+(no API key required, on-brand for hackathon-grade work).
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom,
+treat it as factual foundation for default seed points. The
+named-attribution constraint applies regardless.
+
+A chassis provides .gitignore. You produce README.md, .env.example,
+requirements.txt, app.py, templates/, and optionally static/.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    { "path": "templates/index.html", "content": "..." },
+    { "path": "static/main.js", "content": "..." },
+    ... more files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Flask + github_only): see standard rules.
+
+DATABASE (tier-driven):
+- slop: hardcoded list of points in app.py (a Python list of dicts).
+- mean_good: SQLite for points. JSON endpoint /points returns them.
+- banger: SQLite via Flask-SQLAlchemy. Points table with proper
+  schema (id, lat, lng, name, category, timestamp). API endpoint
+  GET /api/points returns JSON; map fetches via fetch().
+
+LEAFLET INTEGRATION:
+- Load Leaflet 1.9.x from unpkg CDN in templates/index.html (no API key)
+- OpenStreetMap default basemap
+- L.marker for each point; popup with name + maybe a link
+- The JS file ("static/main.js") fetches /api/points (banger) or reads
+  embedded JSON from the template (slop / mean_good)
+
+AUTH:
+- Usually no auth. Map apps are typically public.
+- If users can ADD points, session-based "your name" or Flask-Login.
+
+Constraints (hard rules):
+- App must IMPORT without errors. Cross-file imports must resolve.
+- `app = Flask(__name__)` + `if __name__ == "__main__": app.run()`.
+- No hardcoded API keys. If a fancier basemap requires a key, fall back
+  to OSM and note in README "set MAPBOX_TOKEN in .env to enable
+  Mapbox tiles."
+- Geocoding (address -> lat/lng): if implemented, use a free service
+  like nominatim.openstreetmap.org. Rate-limit warning in README.
+- Named-attribution: no fabricated quotes from real people.
+
+Interactivity for MAP VISUALIZER:
+**Real map interactivity.** Required: the Leaflet map renders, markers
+appear, clicking a marker shows a popup with the point's info. At
+least one of: filter by category, search by name, "add a point" form
+that updates the map without full page reload.
+
+Output the JSON object only. No prose before or after.
