@@ -55,6 +55,10 @@ _V0_BUILDABLE: frozenset[str] = frozenset({
     "ai_agent",       # Bundle H: Gradio + HF Spaces
 })
 
+# Public alias for tooling that wants to know what's buildable today
+# (e.g. the ship-one CLI's --archetype validation).
+V0_BUILDABLE: frozenset[str] = _V0_BUILDABLE
+
 # Bundle G: blend rules.
 # When top-2 scores are within BLEND_DELTA of each other AND both >=
 # threshold (7) AND both archetypes are buildable, with probability

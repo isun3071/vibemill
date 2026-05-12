@@ -61,6 +61,8 @@ from .model_rotation import ModelChoice
 from .models import (
     AppRecord,
     GeneratorOutput,
+    MatcherResult,
+    MatcherScores,
     NewsItem,
 )
 from .verify import VERDICT_FAILED, VERDICT_LOOKS_GOOD
@@ -175,25 +177,113 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
         return False, f"build harness error: {exc}"
 
 
-def _run_python_check(work: Path) -> tuple[bool, str]:
-    """Bundle H: lightweight build proxy for Python apps. Parse app.py with
-    ast (no execution) to catch syntax errors; the real install + import
-    validation happens at HF Spaces deploy time.
-
-    This is a deliberately cheap check. HF rejects misconfigured Spaces
-    quickly; the orchestrator already handles deploy-stage failures as
-    death_cause='never_built'. A heavier local check (venv + pip install)
-    would slow the tick budget significantly with little additional signal.
+def _python_top_level_names(tree) -> set[str]:
+    """Collect names a module exports at module scope: defs, classes,
+    top-level assignments, and re-exports via `import` / `from X import Y`.
+    Used by _validate_python_imports to verify cross-file imports resolve.
     """
-    import ast
+    import ast as _ast
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, _ast.Assign):
+            for tgt in node.targets:
+                if isinstance(tgt, _ast.Name):
+                    names.add(tgt.id)
+                elif isinstance(tgt, (_ast.Tuple, _ast.List)):
+                    for elt in tgt.elts:
+                        if isinstance(elt, _ast.Name):
+                            names.add(elt.id)
+        elif isinstance(node, _ast.AnnAssign):
+            if isinstance(node.target, _ast.Name):
+                names.add(node.target.id)
+        elif isinstance(node, _ast.ImportFrom):
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                names.add(alias.asname or alias.name)
+        elif isinstance(node, _ast.Import):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.split(".")[0])
+    return names
+
+
+def _validate_python_imports(work: Path) -> tuple[bool, str]:
+    """Static cross-file import resolution. For each `from <local> import X`
+    where <local> matches another .py in the work dir, verify X is actually
+    defined (or re-exported) there. Catches the common LLM bug where app.py
+    imports `from utils import foo` but utils.py never defines `foo`.
+
+    Skips: relative imports, star imports, imports from non-local modules
+    (those are pip-resolved at HF deploy time and out of scope here).
+    """
+    import ast as _ast
+    py_files = sorted(work.glob("*.py"))
+    file_stems = {p.stem for p in py_files}
+
+    parsed: dict[str, _ast.Module] = {}
+    for path in py_files:
+        try:
+            parsed[path.stem] = _ast.parse(path.read_text())
+        except SyntaxError:
+            # Syntax errors are surfaced separately by _run_python_check;
+            # skip cross-import validation for files that don't parse.
+            continue
+
+    defined: dict[str, set[str]] = {
+        stem: _python_top_level_names(tree) for stem, tree in parsed.items()
+    }
+
+    for stem, tree in parsed.items():
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.ImportFrom):
+                continue
+            if node.module is None:
+                continue  # `from . import x` — relative, skip
+            top = node.module.split(".")[0]
+            if top not in file_stems:
+                continue  # third-party / stdlib, out of scope
+            available = defined.get(top, set())
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                if alias.name not in available:
+                    return False, (
+                        f"{stem}.py imports '{alias.name}' from '{node.module}' "
+                        f"but {top}.py does not define or re-export it. "
+                        f"({top}.py defines: {sorted(available)[:10]}{'...' if len(available) > 10 else ''})"
+                    )
+    return True, "cross-file imports resolve"
+
+
+def _run_python_check(work: Path) -> tuple[bool, str]:
+    """Bundle H: lightweight build proxy for Python apps. Two passes, both
+    static — no pip install, no execution:
+
+    1. ast.parse on every .py file (catches syntax errors).
+    2. Cross-file import resolution (catches `from utils import X` where
+       utils.py doesn't define X — a common LLM failure mode that
+       HF Spaces only catches at deploy time, by which point the Space
+       and GitHub repo are already created).
+
+    Real install + runtime-import validation still happens at HF Spaces
+    deploy time. A heavier local check (venv + pip install + import) would
+    bloat the tick budget for marginal signal.
+    """
+    import ast as _ast
     app_py = work / "app.py"
     if not app_py.is_file():
         return False, "no app.py at the root of the working directory"
-    try:
-        ast.parse(app_py.read_text())
-    except SyntaxError as exc:
-        return False, f"app.py syntax error: {exc}"
-    return True, "app.py parses cleanly"
+    for path in sorted(work.glob("*.py")):
+        try:
+            _ast.parse(path.read_text())
+        except SyntaxError as exc:
+            return False, f"{path.name} syntax error: {exc}"
+    ok, msg = _validate_python_imports(work)
+    if not ok:
+        return False, msg
+    return True, "python build checks pass"
 
 
 def _run_build_check(work: Path, archetype: str) -> tuple[bool, str]:
@@ -209,13 +299,39 @@ def _run_build_check(work: Path, archetype: str) -> tuple[bool, str]:
 # ============================================================================
 
 
-def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
+def _synthesize_matcher_result(archetype: str) -> MatcherResult:
+    """Build a MatcherResult that points at `archetype` with a confident
+    score. Used by manual-trigger paths to bypass the matcher LLM call
+    while still going through the rest of `_ship_one` unchanged."""
+    scores = MatcherScores(**{archetype: 10})  # all others default to 0
+    return MatcherResult(
+        scores=scores,
+        selected_archetypes=[archetype],
+        reasoning="manual override (ship-one CLI)",
+    )
+
+
+def _ship_one(
+    item: NewsItem,
+    *,
+    synthetic_track: str | None = None,
+    archetype_override: str | None = None,
+    tier_override: str | None = None,
+) -> str:
     """Process one input item (news or synthetic) all the way to a live
     Vercel URL or a logged rejection / stillborn marker.
 
     `synthetic_track` (Bundle G): set to "{group}:{slug}" when this input
     came from the synthetic-prompt pipeline; None for news. Used for
     AppRecord storage and to derive source kind.
+
+    `archetype_override` and `tier_override` (CLI ship-one): if set, skip
+    the corresponding dice. Archetype override skips the matcher LLM call
+    entirely (saves the matcher cost AND guarantees the forced archetype
+    routes through, even if the input wouldn't naturally score there).
+    Tier override skips the tier roll. Guard, generator, verifier,
+    static analysis, build, publish, deploy, screenshot, snapshot all
+    run normally.
 
     Returns one of:
         'shipped' | 'rejected_guard' | 'rejected_matcher' | 'rejected_archetype'
@@ -250,8 +366,12 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
         log.info("rejected at guard: %s | %s", item.headline[:60], g.reason)
         return "rejected_guard"
 
-    # 2. Matcher
-    m = matcher.score(prompt)
+    # 2. Matcher (skipped when manually overriding archetype).
+    if archetype_override is not None:
+        m = _synthesize_matcher_result(archetype_override)
+        log.info("matcher skipped (override): forcing archetype=%s", archetype_override)
+    else:
+        m = matcher.score(prompt)
     if m is None:
         db.insert_rejection(
             source=source_kind, prompt=prompt, rejection_stage="matcher",
@@ -312,7 +432,11 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
     # Roll the tier dice INDEPENDENT of input score. The tier determines
     # web-search budget, build-retry cap, reasoning effort. Per
     # ANTI_PATTERNS rule 5 v5, this samples real-producer effort variance.
-    tier = tiers.pick_tier()
+    if tier_override is not None:
+        tier = tier_override
+        log.info("tier dice skipped (override): forcing tier=%s", tier)
+    else:
+        tier = tiers.pick_tier()
     tier_cfg = tiers.get_config(tier)
     committed_path = tier == tiers.TIER_BANGER  # backwards-compat with migration 004
 
@@ -557,6 +681,20 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
             github.archive_repo(app_id)
         except Exception as exc2:
             log.warning("%s: github archive after deploy failure also failed: %s", app_id, exc2)
+        # Bundle H: clean up the HF Space too if we got far enough to create
+        # one. create_and_push happens BEFORE wait_for_url, so a deploy
+        # failure on the Python rail (e.g. RUNTIME_ERROR) leaves a broken
+        # Space sitting in the namespace. Delete it.
+        if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+            try:
+                from .clients import hf_spaces
+                hf_spaces.delete_space(app_id)
+                log.info("%s: deleted hf space after deploy failure", app_id)
+            except Exception as exc2:
+                log.warning(
+                    "%s: hf space delete after deploy failure also failed: %s",
+                    app_id, exc2,
+                )
         db.insert_app(AppRecord(
             id=app_id, prompt=prompt, archetype=archetype,
             archetype_score=m.scores.as_dict()[archetype], source=source_kind,

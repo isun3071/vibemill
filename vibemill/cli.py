@@ -140,6 +140,90 @@ def reset_daily_cost_cmd(yes: bool) -> None:
     console.print(f"reset: deleted {deleted} llm_calls rows for today")
 
 
+@cli.command("ship-one")
+@click.option(
+    "--archetype", required=True,
+    help="Force the archetype (skips matcher dice). Must be in V0_BUILDABLE.",
+)
+@click.option(
+    "--tier", required=True, type=click.Choice(["slop", "mean_good", "banger"]),
+    help="Force the output tier (skips the tier roll).",
+)
+@click.option(
+    "--prompt", default=None,
+    help="Inline prompt to use as the source. If unset, synthesizes one via the "
+         "synthetic_prompt pipeline.",
+)
+@click.option(
+    "--no-snapshot", is_flag=True,
+    help="Skip the snapshot push at the end (debug use).",
+)
+def ship_one_cmd(archetype: str, tier: str, prompt: str | None, no_snapshot: bool) -> None:
+    """Manually trigger ONE app ship with a forced archetype + tier.
+
+    Bypasses the matcher and tier dice so test runs are deterministic. The
+    rest of the pipeline (guard, generator, verifier, static analysis,
+    build, GitHub publish, deploy, screenshot, snapshot) runs normally
+    and produces a real artifact.
+    """
+    from datetime import datetime, timezone
+    import secrets
+    from . import __main__, matcher, synthetic_prompt, tracks
+    from .models import NewsItem
+
+    if archetype not in matcher.V0_BUILDABLE:
+        console.print(
+            f"[red]archetype {archetype!r} is not in the buildable set: "
+            f"{sorted(matcher.V0_BUILDABLE)}[/red]"
+        )
+        sys.exit(1)
+
+    if prompt:
+        # Manual prompt path. Synthesize a NewsItem-shaped record with a
+        # unique URL so news_cache and AppRecord don't collide.
+        uniq = secrets.token_hex(4)
+        item = NewsItem(
+            url=f"https://vibemill.dev/manual/{archetype}/{uniq}",
+            headline=prompt[:200],
+            summary=prompt,
+            feed_source="manual",
+            published_at=datetime.now(timezone.utc),
+        )
+        synthetic_track = None
+        console.print(f"using inline prompt ({len(prompt)} chars)")
+    else:
+        # Synthetic path: roll a random track and have Claude Haiku generate
+        # a news-shape item conditioned on it.
+        track = tracks.pick_track()
+        item = synthetic_prompt.generate(track)
+        synthetic_track = f"{track.group}:{track.slug or '-'}"
+        console.print(f"synthesized prompt via track={synthetic_track}: {item.headline}")
+
+    console.print(f"shipping: archetype=[cyan]{archetype}[/cyan] tier=[cyan]{tier}[/cyan]")
+    outcome = __main__._ship_one(
+        item,
+        synthetic_track=synthetic_track,
+        archetype_override=archetype,
+        tier_override=tier,
+    )
+    console.print(f"outcome: [{'green' if outcome == 'shipped' else 'yellow'}]{outcome}[/]")
+
+    if not no_snapshot and outcome in ("shipped", "screenshot_missing"):
+        from . import snapshot
+        try:
+            counts = snapshot.push()
+            console.print(f"snapshot: {counts}")
+        except Exception as exc:
+            console.print(f"[yellow]snapshot push failed: {exc}[/yellow]")
+
+    audit.event(
+        operator=audit.CLI,
+        operation="ship_one",
+        target=None,
+        reason=f"archetype={archetype} tier={tier} outcome={outcome}",
+    )
+
+
 @cli.command("rescreenshot")
 @click.option(
     "--app-id", default=None,

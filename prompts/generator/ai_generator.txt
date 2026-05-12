@@ -87,6 +87,12 @@ failure (no traceback to the UI).
 
 Constraints (the only hard rules):
 - The app must IMPORT without errors. Syntax errors fail the static check.
+- If you split into multiple .py files (e.g. utils.py, prompts.py): every
+  `from <module> import <name>` to a SIBLING file MUST resolve. If app.py
+  has `from utils import build_prompt`, then utils.py MUST define
+  build_prompt at module scope (def, class, or assignment) OR re-export
+  it via its own import. Missing cross-file names fail the static check
+  and the app won't import at HF Spaces deploy time either.
 - gr.Interface(...).launch() OR gr.Blocks() ... demo.launch() at the bottom
   inside a `if __name__ == "__main__":` block — HF Spaces runs app.py as
   the main module.

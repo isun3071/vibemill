@@ -145,19 +145,14 @@ def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
 
 def _build(work: Path, archetype: str) -> tuple[bool, str]:
     """Substrate-aware build proxy. JS: npm install + next build.
-    Python (Bundle H): ast.parse(app.py) for a cheap syntax check; HF
-    Spaces validates the rest at deploy time, which smoke skips."""
+    Python (Bundle H): ast.parse + cross-file import resolution. Real
+    pip install + runtime import validation happens at HF deploy time,
+    which smoke skips. We reuse __main__'s helpers for parity so smoke
+    and the real pipeline can't drift."""
     from .models import SUBSTRATE_BY_ARCHETYPE
     if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
-        import ast
-        app_py = work / "app.py"
-        if not app_py.is_file():
-            return False, "no app.py at the root of the working directory"
-        try:
-            ast.parse(app_py.read_text())
-        except SyntaxError as exc:
-            return False, f"app.py syntax error: {exc}"
-        return True, "app.py parses cleanly"
+        from .__main__ import _run_python_check
+        return _run_python_check(work)
 
     install = subprocess.run(
         ["npm", "install", "--no-audit", "--no-fund", "--silent"],
