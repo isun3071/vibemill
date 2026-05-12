@@ -51,12 +51,18 @@ _MAX_TOKENS = 12000  # raised from 8k for multi-file output
 @dataclass(frozen=True)
 class SubstrateRules:
     """Per-substrate file-path policy. The generator dispatches by archetype
-    to either JS_RULES (Next.js apps) or PYTHON_RULES (Gradio apps)."""
+    to JS_RULES (Next.js), GRADIO_RULES (Gradio), or FLASK_RULES (Flask)."""
     required_path: str
-    allowed_path_prefixes: tuple[str, ...]   # empty = top-level only
+    allowed_path_prefixes: tuple[str, ...]   # subdirectories the LLM may write to
     allowed_extensions: tuple[str, ...]
     allowed_basenames: frozenset[str]        # explicit allowlist (e.g. requirements.txt)
     chassis_owned: frozenset[str]
+    # If True, top-level files (no subdirectory) are allowed when their
+    # extension is in allowed_extensions. If False, top-level files must
+    # match allowed_basenames exactly. JS wants strict (False) because the
+    # app/ + lib/ structure is part of the Next.js scaffold; Flask wants
+    # permissive (True) for app.py + helper modules like models.py/auth.py.
+    allow_top_level_files: bool = False
 
 
 JS_RULES = SubstrateRules(
@@ -67,6 +73,7 @@ JS_RULES = SubstrateRules(
     # layout.tsx carries the Vibe Mill footer (ANTI_PATTERNS rule 10),
     # and globals.css holds the Tailwind directives.
     chassis_owned=frozenset({"app/layout.tsx", "app/globals.css"}),
+    allow_top_level_files=False,
 )
 
 # Bundle H: Gradio apps on HF Spaces. Top-level .py files only; the
@@ -78,13 +85,14 @@ GRADIO_RULES = SubstrateRules(
     allowed_extensions=(".py",),
     allowed_basenames=frozenset({"requirements.txt"}),
     chassis_owned=frozenset({"README.md", ".gitignore"}),
+    allow_top_level_files=True,
 )
 
 # Bundle I: Flask apps that live as GitHub repos (deploy_target=github_only).
-# Allowed structure: app.py, templates/*.html, static/{css,js,...}, optional
-# top-level helper .py files. README.md is LLM-produced (no HF frontmatter),
-# .gitignore is chassis-owned, .env.example is LLM-produced (placeholder
-# values for OAuth client_id/client_secret, DB URLs, etc.).
+# Allowed structure: app.py + helper .py modules at top level (models.py,
+# auth.py, forms.py, etc.), templates/*.html, static/{css,js,...}. README.md
+# is LLM-produced (no HF frontmatter), .gitignore is chassis-owned,
+# .env.example is LLM-produced (placeholder values for OAuth, DB, etc.).
 FLASK_RULES = SubstrateRules(
     required_path="app.py",
     allowed_path_prefixes=("templates/", "static/"),
@@ -92,9 +100,8 @@ FLASK_RULES = SubstrateRules(
     allowed_basenames=frozenset({
         "requirements.txt", ".env.example", "Dockerfile", "docker-compose.yml",
     }),
-    # .gitignore is chassis-pinned (Python ignore patterns); the LLM
-    # produces README.md (the persona-driven setup-steps narrative).
     chassis_owned=frozenset({".gitignore"}),
+    allow_top_level_files=True,
 )
 
 # Back-compat alias. Pre-Bundle-I code referenced PYTHON_RULES when it
@@ -116,27 +123,47 @@ class GeneratorJSONError(RuntimeError):
 
 
 def _is_valid_slot_path(path: str, rules: SubstrateRules) -> tuple[bool, str | None]:
-    """(ok, reason_if_not). Strict path validation against the substrate rules."""
+    """(ok, reason_if_not). Strict path validation against the substrate rules.
+
+    Decision tree:
+      1. Reject absolute / backslash / traversal paths.
+      2. Top-level basename in allowed_basenames -> OK (covers requirements.txt etc.).
+      3. Path under one of allowed_path_prefixes with allowed extension -> OK.
+      4. Top-level file with allowed extension AND allow_top_level_files -> OK
+         (covers Flask's app.py + helper modules, Gradio's app.py + utils.py).
+      5. Otherwise reject.
+    """
     if not path or path.startswith("/") or "\\" in path:
         return False, "path must be relative, no backslashes"
     parts = path.split("/")
     if ".." in parts:
         return False, "path traversal not allowed"
-    # Explicit basename allowlist (e.g. requirements.txt) bypasses
-    # prefix/extension checks.
+    is_top_level = len(parts) == 1
     basename = parts[-1]
-    if basename in rules.allowed_basenames and len(parts) == 1:
+
+    # Rule 2: explicit basename allowlist.
+    if is_top_level and basename in rules.allowed_basenames:
         return True, None
-    if rules.allowed_path_prefixes:
-        if not any(path.startswith(p) for p in rules.allowed_path_prefixes):
-            return False, f"path must start with {rules.allowed_path_prefixes} or be one of {sorted(rules.allowed_basenames)}"
-    else:
-        # No prefixes allowed: must be top-level.
-        if len(parts) != 1:
-            return False, "path must be top-level (no subdirectories)"
-    if not any(path.endswith(e) for e in rules.allowed_extensions):
-        return False, f"file extension must be one of {rules.allowed_extensions}"
-    return True, None
+
+    has_allowed_ext = any(path.endswith(e) for e in rules.allowed_extensions)
+    has_allowed_prefix = any(path.startswith(p) for p in rules.allowed_path_prefixes)
+
+    # Rule 3: under an allowed prefix.
+    if has_allowed_prefix:
+        if not has_allowed_ext:
+            return False, f"file extension must be one of {rules.allowed_extensions}"
+        return True, None
+
+    # Rule 4: top-level with allowed extension, if substrate permits.
+    if is_top_level and rules.allow_top_level_files and has_allowed_ext:
+        return True, None
+
+    # Rule 5: reject with a descriptive message.
+    if is_top_level:
+        if rules.allow_top_level_files:
+            return False, f"top-level file extension must be one of {rules.allowed_extensions} or basename in {sorted(rules.allowed_basenames)}"
+        return False, f"top-level files must match allowed_basenames {sorted(rules.allowed_basenames)} (prefixes: {rules.allowed_path_prefixes})"
+    return False, f"path must start with {rules.allowed_path_prefixes} or be one of {sorted(rules.allowed_basenames)}"
 
 
 def _filter_files(files: list[GeneratedFile], rules: SubstrateRules) -> list[GeneratedFile]:
