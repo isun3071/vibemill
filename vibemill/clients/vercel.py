@@ -83,11 +83,29 @@ def create_project(name: str, github_repo_full: str) -> dict[str, Any]:
         "name": name,
         "framework": "nextjs",
         "gitRepository": {"type": "github", "repo": github_repo_full},
+        # Vibe Mill apps are public artifacts. Override any team-wide
+        # Vercel Authentication so deployments don't sit behind SSO and
+        # render the login page instead of the actual app (which also
+        # breaks the screenshot pipeline).
+        "ssoProtection": None,
     }
     r = _request("POST", "/v9/projects", json=payload)
     if r.status_code not in (200, 201):
         raise VercelError(f"create_project {name}: HTTP {r.status_code}: {r.text[:400]}")
     return r.json()
+
+
+def disable_sso_protection(name: str) -> None:
+    """Clear SSO/Vercel Authentication on an already-created project.
+
+    Used by the `rescreenshot` CLI to retroactively unblock projects that
+    were created before ssoProtection=null was added to create_project.
+    """
+    r = _request("PATCH", f"/v9/projects/{name}", json={"ssoProtection": None})
+    if r.status_code not in (200, 204):
+        raise VercelError(
+            f"disable_sso_protection {name}: HTTP {r.status_code}: {r.text[:300]}"
+        )
 
 
 def get_project(name: str) -> dict[str, Any] | None:

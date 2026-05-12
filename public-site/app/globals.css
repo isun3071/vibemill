@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: theme("colors.paper.DEFAULT");
+  color: theme("colors.ink.DEFAULT");
+  font-family: var(--font-serif), Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark html,
+.dark body,
+html.dark,
+body.dark {
+  background: theme("colors.night.DEFAULT");
+  color: theme("colors.moon.DEFAULT");
+}
+
+::selection {
+  background: theme("colors.ink.DEFAULT");
+  color: theme("colors.paper.DEFAULT");
+}
+
+.dark ::selection {
+  background: theme("colors.moon.DEFAULT");
+  color: theme("colors.night.DEFAULT");
+}
