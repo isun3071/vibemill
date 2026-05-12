@@ -7,8 +7,11 @@
 What 'retire' means (per OPERATIONS.md):
 1. Mark status='archived', retired_at=now, death_cause set
 2. Archive the GitHub repo (PATCH archived=true; preserves the artifact)
-3. Delete the Vercel project (Vercel has no archive concept; deletion frees
-   the free-tier project slot)
+3. Delete the deploy target. Bundle H: per-archetype dispatch — Vercel
+   project for JS apps, HF Space for Python apps. Both deploy targets
+   are paid/quota-limited; deletion frees the slot. The GitHub repo is
+   archived in step 2 regardless, since GitHub holds the canonical
+   source for every app (both rails mirror to GitHub at create time).
 4. Audit log the action
 5. (Caller pushes the snapshot; rotation does not push per-app)
 """
@@ -20,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from . import audit, db, snapshot
-from .clients import github, vercel
+from .clients import github, hf_spaces, vercel
 from .config import get_settings
 
 log = logging.getLogger(__name__)
@@ -30,17 +33,32 @@ log = logging.getLogger(__name__)
 class RetireOutcome:
     app_id: str
     github_archived: bool
-    vercel_deleted: bool
+    deploy_deleted: bool   # Vercel project OR HF Space, depending on deploy_target
 
 
 def _now_iso() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _delete_deploy(app_id: str, deploy_target: str | None) -> bool:
+    """Delete the live deployment for this app. Returns True on success.
+
+    Bundle H: dispatch on deploy_target. Legacy apps (deploy_target is None
+    because they were shipped before migration 010) default to Vercel,
+    matching pre-Bundle-H behavior.
+    """
+    target = deploy_target or "vercel"
+    if target == "hf_spaces":
+        hf_spaces.delete_space(app_id)
+    else:
+        vercel.delete_project(app_id)
+    return True
+
+
 def retire_app(app_id: str, *, reason: str = "manual") -> RetireOutcome:
     """Retire one app. Used by both the rotation cron and the CLI.
 
-    Per OPERATIONS.md the GitHub archive and Vercel delete each fail
+    Per OPERATIONS.md the GitHub archive and deploy-target delete each fail
     independently; we record what succeeded and proceed. The status
     transition in SQLite happens last so a retry after partial failure
     will still attempt the cleanup steps.
@@ -50,7 +68,7 @@ def retire_app(app_id: str, *, reason: str = "manual") -> RetireOutcome:
         raise KeyError(f"app {app_id!r} not found")
 
     death_cause = "rotation" if reason == "rotation" else "manual"
-    log.info("retire %s (cause=%s)", app_id, death_cause)
+    log.info("retire %s (cause=%s deploy_target=%s)", app_id, death_cause, app.deploy_target)
 
     archived = False
     try:
@@ -61,10 +79,12 @@ def retire_app(app_id: str, *, reason: str = "manual") -> RetireOutcome:
 
     deleted = False
     try:
-        vercel.delete_project(app_id)
-        deleted = True
+        deleted = _delete_deploy(app_id, app.deploy_target)
     except Exception as exc:
-        log.warning("retire %s: vercel delete failed: %s", app_id, exc)
+        log.warning(
+            "retire %s: deploy delete (target=%s) failed: %s",
+            app_id, app.deploy_target, exc,
+        )
 
     db.update_app(
         app_id,
@@ -76,9 +96,9 @@ def retire_app(app_id: str, *, reason: str = "manual") -> RetireOutcome:
         operator=audit.ORCHESTRATOR if reason == "rotation" else audit.CLI,
         operation="app.retire",
         target=app_id,
-        reason=f"github_archived={archived} vercel_deleted={deleted} cause={death_cause}",
+        reason=f"github_archived={archived} deploy_deleted={deleted} target={app.deploy_target} cause={death_cause}",
     )
-    return RetireOutcome(app_id=app_id, github_archived=archived, vercel_deleted=deleted)
+    return RetireOutcome(app_id=app_id, github_archived=archived, deploy_deleted=deleted)
 
 
 def run_rotation(*, push_snapshot: bool = True) -> list[RetireOutcome]:

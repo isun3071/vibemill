@@ -42,6 +42,28 @@ ARCHETYPE_NAMES: tuple[str, ...] = (
     "parody_ui",
 )
 
+# Bundle H: which substrate (language + deploy target) each archetype uses.
+# 'js' archetypes are Next.js apps on Vercel; 'python' archetypes are Gradio
+# apps on HF Spaces. Stubs not yet lit up are listed with their intended
+# substrate so future bundles know where they're routed. Adding an archetype
+# to the matcher's buildable set without also setting its substrate here is
+# a bug; the generator dispatches off this map.
+SUBSTRATE_BY_ARCHETYPE: dict[str, str] = {
+    "tracker": "js",
+    "chatbot": "js",
+    "utility_tool": "js",
+    "search_directory": "js",
+    "ai_generator": "python",  # Bundle H
+    "ai_agent": "python",      # Bundle H
+    "game": "js",
+    "glorified_todo": "js",
+    "glorified_social": "js",
+    "recommendation_engine": "js",
+    "marketplace": "js",
+    "map_visualizer": "js",
+    "parody_ui": "js",
+}
+
 ArchetypeName = Literal[
     "tracker",
     "ai_agent",
@@ -214,6 +236,13 @@ class AppRecord(BaseModel):
     # archetype if the matcher rolled a blend (None for single-archetype apps).
     synthetic_track: str | None = None
     blend_partner_archetype: str | None = None
+    # Migration 010: Bundle H Python rail via HF Spaces.
+    # deploy_target is 'vercel' for Next.js apps, 'hf_spaces' for Gradio apps.
+    # hf_space_url holds the live URL for HF-deployed apps; vercel_url still
+    # holds it for Vercel-deployed apps. The public site picks the right one
+    # based on deploy_target.
+    deploy_target: str | None = None
+    hf_space_url: str | None = None
 
 
 class RejectionRecord(BaseModel):

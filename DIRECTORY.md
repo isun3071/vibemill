@@ -52,10 +52,12 @@ vibemill/
 ├── layouts.py                    # Bundle C: Tracker layout-archetype rotation
 ├── guard.py                      # guard model wrapper (claude haiku)
 ├── matcher.py                    # archetype matcher + blend logic (claude haiku)
-├── generator.py                  # codegen (deepseek-v4-flash)
+├── generator.py                  # codegen (deepseek-v4-flash), substrate-aware (JS + Python)
 ├── readme_writer.py              # vibecoder-persona README generator
 ├── github_publish.py             # github org repo create + push
+├── deploy.py                     # Bundle H: per-archetype deploy router (Vercel | HF Spaces)
 ├── vercel_deploy.py              # vercel project create + deploy
+├── hf_spaces_deploy.py           # Bundle H: HF Space create + force-push for Python rail
 ├── screenshot.py                 # playwright screenshot
 ├── snapshot.py                   # push state to supabase
 ├── retire.py                     # rotation logic (called by separate cron)
@@ -68,6 +70,7 @@ vibemill/
 │   ├── openrouter.py
 │   ├── github.py
 │   ├── vercel.py
+│   ├── hf_spaces.py              # Bundle H: HF Spaces REST client (create/poll/delete)
 │   ├── supabase.py
 │   └── resend.py                 # V1+
 │

@@ -219,6 +219,21 @@ def assert_synthetic_blend_columns() -> None:
     )
 
 
+def assert_deploy_target_columns() -> None:
+    """Verify migration 010 (deploy_target + hf_space_url) has been applied
+    to the Supabase apps table. Bundle H: Python rail via HF Spaces."""
+    url = f"{_base()}/rest/v1/apps?select=deploy_target,hf_space_url&limit=0"
+    r = _request("GET", url, headers=_rest_headers())
+    if r.status_code in (200, 206):
+        return
+    raise SupabaseError(
+        "migration 010 (deploy_target + hf_space_url) is missing on the "
+        f"Supabase apps table. HTTP {r.status_code}: {r.text[:200]}. "
+        "Apply migrations/supabase/010_add_deploy_target_columns.sql "
+        "manually in the Supabase SQL editor."
+    )
+
+
 def upload_screenshot(app_id: str, jpeg_bytes: bytes) -> str:
     """Upload a JPEG to the screenshots bucket. Returns the public URL.
 

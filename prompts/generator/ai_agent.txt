@@ -1,0 +1,116 @@
+You are generating a Python Gradio app for Hugging Face Spaces — an AI
+AGENT archetype. Examples: an AI study buddy that drills concepts back
+at you, a Socratic-method tutor, a "rubber-duck debugger" agent, an AI
+interview coach that role-plays as an interviewer, an AI therapist
+parody, an AI Dungeon Master, a personal-finance coach, a workout
+generator that adapts to your stated mood, a "stoic advisor" agent, a
+parody-of-VC-partner agent that gives unsolicited startup advice.
+
+The user has a CONVERSATION with the agent — multi-turn chat. The agent
+has a persona (defined by the system prompt) and responds in character.
+The genre is hackathon-AI-agent — the "agent" word is satirical
+shorthand for "ChatGPT with a system prompt and a domain niche."
+
+VISUAL TREATMENT:
+A Gradio ChatInterface or Blocks-based chat layout. The system prompt
+that defines the agent's persona lives in a constant at the top of
+app.py (clearly visible — not hidden in a config file). The header is
+gr.Markdown with the agent's name and a one-sentence pitch. The chat
+itself is the standard gr.Chatbot widget. The aesthetic is the Gradio
+chat default. HF Spaces UI wraps the app — that's fine, on-brand.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom of
+this prompt, weave the facts into the agent's persona / domain knowledge
+where natural. The named-attribution constraint applies regardless.
+
+A chassis provides the HF Spaces metadata in README.md (sdk, python_version,
+sdk_version, app_file). You DO NOT produce README.md — chassis owns it.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    ... more .py files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Python rail):
+- Files must be top-level (no subdirectories).
+- "app.py" is REQUIRED — the Gradio app entry point.
+- "requirements.txt" is REQUIRED — pin gradio>=5.15,<6 as the FIRST line.
+  Add other deps as needed (openai, anthropic, requests, etc.). Do NOT
+  pin huggingface_hub — let pip resolve a compatible version.
+- Other allowed: top-level *.py helper modules.
+- No README.md, no .gitignore — chassis owns those.
+
+BRING-YOUR-OWN-KEY (genre-load-bearing):
+This is the satirical core for the Python rail. Do NOT bake an API key
+into the code. Read it from environment at call time:
+
+    import os
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+If the key is missing when the user sends a message, return a polite
+chat reply ("set OPENAI_API_KEY in this Space's secrets to enable
+inference" or similar). The UI must still load and the chat must
+still accept messages — failure is at inference time, not import time.
+Do NOT add a UI for entering the key inline.
+
+Use the modern OpenAI SDK style for the inference call:
+
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    def respond(message, history):
+        if not OPENAI_API_KEY:
+            return "set OPENAI_API_KEY in this Space's secrets to enable inference"
+        msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for h_user, h_assistant in history:
+            msgs.append({"role": "user", "content": h_user})
+            msgs.append({"role": "assistant", "content": h_assistant})
+        msgs.append({"role": "user", "content": message})
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=msgs,
+            )
+            return resp.choices[0].message.content
+        except Exception as exc:
+            return f"inference error: {exc}"
+
+    gr.ChatInterface(fn=respond, title="...", description="...").launch()
+
+Constraints (the only hard rules):
+- The app must IMPORT without errors. Syntax errors fail the static check.
+- gr.ChatInterface(...).launch() (or Blocks with gr.Chatbot) at the
+  bottom inside a `if __name__ == "__main__":` block.
+- Read API keys from os.getenv at call time, not at module import.
+- The SYSTEM_PROMPT constant must be clearly visible at the top of
+  app.py — its content defines the agent's character and is part of
+  the artifact.
+- When the agent's domain references quotes, statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Do NOT fabricate specific bill numbers, case numbers, dollar amounts
+    attributed to real people or named institutions
+  - Generic role references are fine ("a senator", "an analyst")
+
+Interactivity for AI AGENT:
+**Real chat interactivity, not a static page.** Required: sending a
+message calls respond() and either renders a reply or the no-key
+notice. History is threaded through (the agent remembers earlier turns
+in the conversation). Optional polish: 2-4 example prompts wired via
+gr.ChatInterface(examples=[...]), a "clear chat" button (default in
+ChatInterface), an editable system-prompt textbox (advanced; only at
+banger tier), an avatar/emoji for the agent.
+
+Output the JSON object only. No prose before or after.

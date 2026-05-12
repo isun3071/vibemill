@@ -100,9 +100,17 @@ def _normalize_verdict(raw: str) -> str:
     return VERDICT_LOOKS_GOOD
 
 
-def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None = None) -> VerifyOutcome:
+def verify(
+    generated: GeneratorOutput,
+    *,
+    archetype: str,
+    model: ModelChoice,
+    app_id: str | None = None,
+) -> VerifyOutcome:
     """Run the verification pass. Always returns; never raises.
 
+    `archetype` selects the substrate rules used to defensively re-validate
+    the verifier's edited file list (Bundle H: JS vs Python file paths).
     `model` is the same ModelChoice the generator used for this app; the
     verifier shares the substrate so the within-app fingerprint is coherent
     (one substrate produces both the code and the verifier's attestation).
@@ -136,9 +144,9 @@ def verify(generated: GeneratorOutput, *, model: ModelChoice, app_id: str | None
         # path constraints the generator uses (no chassis overwrites, no
         # path traversal). Filtering happens in generator._validate_output;
         # we duplicate it here defensively.
-        from .generator import _validate_output as _gen_validate
+        from .generator import validate_output as _gen_validate
         try:
-            out = _gen_validate(GeneratorOutput(files=parsed.files))
+            out = _gen_validate(GeneratorOutput(files=parsed.files), archetype)
         except ValueError as exc:
             log.warning("verify: 'fixed issues' verdict but file set invalid (%s); falling through to original", exc)
             out = generated

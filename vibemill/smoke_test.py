@@ -58,11 +58,15 @@ NEXT_BUILD_TIMEOUT_S = 240
 COST_SANITY_CAP_USD = 0.10
 
 # All bundled smoke fixtures, in the order the CLI runs them.
+# Bundle H: test_news_ai_generator.json exercises the Python rail end-to-end
+# (generator, verifier, static analysis, ast-parse build proxy) without
+# actually pushing to HF Spaces or GitHub.
 DEFAULT_FIXTURES: tuple[str, ...] = (
     "test_news.json",
     "test_news_guard_reject.json",
     "test_news_matcher_reject.json",
     "test_news_non_tracker.json",
+    "test_news_ai_generator.json",
 )
 
 OUTCOME_HAPPY = "happy_path"
@@ -107,19 +111,54 @@ def _load_fixture(name: str) -> tuple[NewsItem, str]:
     return item, expected
 
 
+def _extract_yaml_frontmatter(text: str) -> str | None:
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None
+    return text[: end + len("\n---")]
+
+
 def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
-    """Bundle D: write the LLM's full file list into a fresh chassis copy."""
+    """Bundle D: write the LLM's full file list into a fresh chassis copy.
+
+    Bundle H: preserve HF Spaces YAML frontmatter from the chassis README;
+    persona content goes after it. Matches __main__._stage_chassis logic so
+    smoke and production stay aligned.
+    """
     work = Path(tempfile.mkdtemp(prefix="vibemill-smoke-"))
     shutil.copytree(chassis, work, dirs_exist_ok=True)
     for f in files:
         out_path = work / f.path
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f.content)
-    (work / "README.md").write_text(readme_md or "")
+    readme_path = work / "README.md"
+    existing = readme_path.read_text() if readme_path.exists() else ""
+    fm = _extract_yaml_frontmatter(existing)
+    if fm:
+        readme_path.write_text(f"{fm}\n\n{readme_md or ''}")
+    else:
+        readme_path.write_text(readme_md or "")
     return work
 
 
-def _build(work: Path) -> tuple[bool, str]:
+def _build(work: Path, archetype: str) -> tuple[bool, str]:
+    """Substrate-aware build proxy. JS: npm install + next build.
+    Python (Bundle H): ast.parse(app.py) for a cheap syntax check; HF
+    Spaces validates the rest at deploy time, which smoke skips."""
+    from .models import SUBSTRATE_BY_ARCHETYPE
+    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+        import ast
+        app_py = work / "app.py"
+        if not app_py.is_file():
+            return False, "no app.py at the root of the working directory"
+        try:
+            ast.parse(app_py.read_text())
+        except SyntaxError as exc:
+            return False, f"app.py syntax error: {exc}"
+        return True, "app.py parses cleanly"
+
     install = subprocess.run(
         ["npm", "install", "--no-audit", "--no-fund", "--silent"],
         cwd=work, capture_output=True, text=True, timeout=NEXT_BUILD_TIMEOUT_S,
@@ -198,7 +237,7 @@ def _run_happy_pipeline(
         )
 
         log.info("[%s] 4/10 verifier (attempt %d)", fixture, attempt)
-        v_out = verify.verify(gen, model=smoke_model, app_id=f"smoke-{fixture}")
+        v_out = verify.verify(gen, archetype=archetype, model=smoke_model, app_id=f"smoke-{fixture}")
         log.info("[%s] verifier verdict=%r files=%d", fixture, v_out.verdict, len(v_out.output.files))
 
         log.info("[%s] 6/10 static analysis (attempt %d)", fixture, attempt)
@@ -216,9 +255,9 @@ def _run_happy_pipeline(
         log.info("[%s] 7/10 stage chassis (attempt %d, %d files)", fixture, attempt, len(v_out.output.files))
         work = _stage(chassis, files=v_out.output.files, readme_md=readme)
 
-        log.info("[%s] 8/10 npm install + next build (attempt %d)", fixture, attempt)
+        log.info("[%s] 8/10 build check (attempt %d)", fixture, attempt)
         started = time.monotonic()
-        ok, output = _build(work)
+        ok, output = _build(work, archetype)
         build_seconds = int(time.monotonic() - started)
         if ok:
             log.info("[%s] 9/10 build ok in %ds (attempt %d)", fixture, build_seconds, attempt)

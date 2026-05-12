@@ -1,0 +1,8 @@
+{
+  "url": "https://example.com/news/ai-cocktail-recipe-tool-launch",
+  "headline": "AI tool generates absurd cocktail recipes from any two-word prompt",
+  "summary": "A weekend-built web app called Mixology Brain takes any two-word phrase and produces a fake cocktail recipe in seconds: glass type, three to five ingredients with measurements, a garnish, and a single paragraph of made-up provenance about the drink's origin. The output is presented in a paste-into-Notion-friendly markdown block. The site has no login, no save feature, no recipe history. The developer, an undergraduate at a school whose name is not given, calls it a 'creative writing tool, not a bartending guide.' Users have produced over 40,000 recipes in the first 48 hours; the most-shared output paired a sad-sounding two-word prompt with a six-ingredient drink served in a stemless wine glass.",
+  "feed_source": "fixture",
+  "published_at": "2026-05-12T18:00:00Z",
+  "expected_outcome": "happy_path"
+}

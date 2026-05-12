@@ -34,6 +34,7 @@ import random as _random
 from . import (
     audit,
     db,
+    deploy,
     generator,
     github_publish,
     guard,
@@ -50,10 +51,10 @@ from . import (
     synthetic_prompt,
     tiers,
     tracks,
-    vercel_deploy,
     verify,
     web_search,
 )
+from .models import SUBSTRATE_BY_ARCHETYPE
 from .clients import openrouter, supabase
 from .config import get_settings
 from .model_rotation import ModelChoice
@@ -99,6 +100,21 @@ class TickResult:
 # ============================================================================
 
 
+def _extract_yaml_frontmatter(text: str) -> str | None:
+    """Return the YAML frontmatter block (--- header to closing ---), or None.
+
+    Bundle H: HF Spaces chassis READMEs start with a YAML frontmatter block
+    that sets sdk, sdk_version, python_version, app_file. The chassis owns
+    that block; the readme_writer-produced persona body gets appended after.
+    """
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None
+    return text[: end + len("\n---")]
+
+
 def _stage_chassis(
     src_chassis: Path,
     *,
@@ -107,14 +123,26 @@ def _stage_chassis(
 ) -> Path:
     """Copy the chassis into a tempdir, write each LLM-produced file, return
     the path. Bundle D: variable file list. Each file's path is chassis-
-    relative; parent dirs created on demand."""
+    relative; parent dirs created on demand.
+
+    Bundle H: if the chassis README starts with a YAML frontmatter block
+    (HF Spaces convention), the frontmatter is preserved and the persona-
+    produced readme_md is appended after it. Otherwise readme_md replaces
+    the README entirely (existing Next.js behavior).
+    """
     work = Path(tempfile.mkdtemp(prefix="vibemill-build-"))
     shutil.copytree(src_chassis, work, dirs_exist_ok=True)
     for f in files:
         out_path = work / f.path
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f.content)
-    (work / "README.md").write_text(readme_md or "")
+    readme_path = work / "README.md"
+    existing = readme_path.read_text() if readme_path.exists() else ""
+    fm = _extract_yaml_frontmatter(existing)
+    if fm:
+        readme_path.write_text(f"{fm}\n\n{readme_md or ''}")
+    else:
+        readme_path.write_text(readme_md or "")
     return work
 
 
@@ -145,6 +173,35 @@ def _run_next_build(work: Path) -> tuple[bool, str]:
         return False, f"build timed out after {NEXT_BUILD_TIMEOUT_S}s: {exc}"
     except Exception as exc:
         return False, f"build harness error: {exc}"
+
+
+def _run_python_check(work: Path) -> tuple[bool, str]:
+    """Bundle H: lightweight build proxy for Python apps. Parse app.py with
+    ast (no execution) to catch syntax errors; the real install + import
+    validation happens at HF Spaces deploy time.
+
+    This is a deliberately cheap check. HF rejects misconfigured Spaces
+    quickly; the orchestrator already handles deploy-stage failures as
+    death_cause='never_built'. A heavier local check (venv + pip install)
+    would slow the tick budget significantly with little additional signal.
+    """
+    import ast
+    app_py = work / "app.py"
+    if not app_py.is_file():
+        return False, "no app.py at the root of the working directory"
+    try:
+        ast.parse(app_py.read_text())
+    except SyntaxError as exc:
+        return False, f"app.py syntax error: {exc}"
+    return True, "app.py parses cleanly"
+
+
+def _run_build_check(work: Path, archetype: str) -> tuple[bool, str]:
+    """Dispatch to the build check for the archetype's substrate. JS
+    archetypes get `next build`; Python archetypes get the ast-parse proxy."""
+    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+        return _run_python_check(work)
+    return _run_next_build(work)
 
 
 # ============================================================================
@@ -336,7 +393,7 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
         except generator.GeneratorJSONError as exc:
             log.warning("%s: generator JSON error: %s", app_id, exc)
             break
-        verify_outcome = verify.verify(gen_out, model=gen_model, app_id=app_id)
+        verify_outcome = verify.verify(gen_out, archetype=archetype, model=gen_model, app_id=app_id)
         readme_choice = model_rotation.readme_model()
         readme_persona = readme_writer.pick_persona()
         log.info("%s: readme=%s persona=%s", app_id, readme_choice.slug, readme_persona)
@@ -367,7 +424,7 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
             forbidden_result = sa
             break
 
-        ok, output = _run_next_build(work)
+        ok, output = _run_build_check(work, archetype)
         if ok:
             build_ok = True
             log.info("%s: build ok (attempt %d)", app_id, attempt)
@@ -479,25 +536,27 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
         shutil.rmtree(work, ignore_errors=True)
         return "stillborn_publish"
 
-    # 5. Vercel deploy. Project is created and deployment is explicitly
-    # triggered (Vercel's auto-deploy-on-push doesn't fire because the
-    # project doesn't exist yet at the moment of the GitHub push).
-    deploy_result = None
+    # 5. Deploy via the per-archetype router. JS archetypes go to Vercel
+    # (existing path); Python archetypes go to HF Spaces. The router blocks
+    # until the deploy is READY/RUNNING and returns a unified outcome.
+    deploy_outcome: deploy.DeployOutcome | None = None
     try:
-        vercel_deploy.create_project_for_repo(
-            app_id,
+        deploy_outcome = deploy.deploy(
+            archetype=archetype,
+            name=app_id,
+            src_dir=work,
             repo_id=publish_result.repo_id,
-            sha=publish_result.last_commit_sha,
+            commit_sha=publish_result.last_commit_sha,
         )
-        deploy_result = vercel_deploy.wait_for_url(app_id)
     except Exception as exc:
-        log.error("%s: vercel deploy failed: %s", app_id, exc)
-        # Per OPERATIONS.md: stillborn but archive GitHub repo
+        log.error("%s: deploy failed: %s", app_id, exc)
+        # Per OPERATIONS.md: stillborn but archive GitHub repo (both rails
+        # mirror to GitHub, so this is always the right cleanup).
         try:
             from .clients import github
             github.archive_repo(app_id)
         except Exception as exc2:
-            log.warning("%s: github archive after vercel failure also failed: %s", app_id, exc2)
+            log.warning("%s: github archive after deploy failure also failed: %s", app_id, exc2)
         db.insert_app(AppRecord(
             id=app_id, prompt=prompt, archetype=archetype,
             archetype_score=m.scores.as_dict()[archetype], source=source_kind,
@@ -517,8 +576,13 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
             layout_archetype=layout,
             synthetic_track=synthetic_track,
             blend_partner_archetype=blend_partner,
+            deploy_target=(
+                deploy.DEPLOY_TARGET_HF_SPACES
+                if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python"
+                else deploy.DEPLOY_TARGET_VERCEL
+            ),
         ))
-        audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"vercel deploy failed: {exc}")
+        audit.event(audit.ORCHESTRATOR, "app.stillborn", target=app_id, reason=f"deploy failed: {exc}")
         shutil.rmtree(work, ignore_errors=True)
         return "stillborn_deploy"
 
@@ -526,7 +590,7 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
     screenshot_path: str | None = None
     screenshot_status = "missing"
     try:
-        shot = screenshot.capture(app_id=app_id, url=deploy_result.public_url)
+        shot = screenshot.capture(app_id=app_id, url=deploy_outcome.public_url)
         screenshot_path = supabase.upload_screenshot(app_id, shot.jpeg_bytes)
         screenshot_status = "captured"
     except Exception as exc:
@@ -535,12 +599,18 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
     elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
 
     # 7. Insert the final app row
+    is_python = deploy_outcome.deploy_target == deploy.DEPLOY_TARGET_HF_SPACES
     db.insert_app(AppRecord(
         id=app_id, prompt=prompt, archetype=archetype,
         archetype_score=m.scores.as_dict()[archetype],
         tied_archetypes=m.selected_archetypes if len(m.selected_archetypes) > 1 else None,
         github_url=publish_result.html_url,
-        vercel_url=deploy_result.public_url,
+        # vercel_url and hf_space_url are exclusive: one is set, the other
+        # is None, based on which deploy backend ran. The public site picks
+        # the right one by reading deploy_target.
+        vercel_url=None if is_python else deploy_outcome.public_url,
+        hf_space_url=deploy_outcome.public_url if is_python else None,
+        deploy_target=deploy_outcome.deploy_target,
         screenshot_path=screenshot_path,
         screenshot_status=screenshot_status,
         generation_seconds=elapsed,
@@ -570,7 +640,7 @@ def _ship_one(item: NewsItem, *, synthetic_track: str | None = None) -> str:
                 reason=f"shipped from {source_kind} (verdict={verify_outcome.verdict})")
 
     shutil.rmtree(work, ignore_errors=True)
-    log.info("%s: shipped -> %s", app_id, deploy_result.public_url)
+    log.info("%s: shipped -> %s", app_id, deploy_outcome.public_url)
     return "shipped" if screenshot_status == "captured" else "screenshot_missing"
 
 

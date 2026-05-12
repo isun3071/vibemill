@@ -12,13 +12,18 @@ cycle with the build error appended; that retry is driven by the caller
 
 Bundle D file-list contract:
 - Output is { "files": [{path, content}, ...] }
-- Path validation: must start with 'app/' or 'lib/', must end with .ts/.tsx/.css,
-  no path traversal, no absolute paths.
-- Chassis-owned paths (app/layout.tsx, app/globals.css) are silently dropped
-  if the LLM tries to write them. Chassis wins; rule 10 (the footer
-  disclaimer in layout.tsx is non-negotiable).
-- app/page.tsx must be present in the validated set. Without it the build
+- Path validation: substrate-dependent (Bundle H). JS archetypes accept
+  app/* and lib/* with .ts/.tsx/.css. Python archetypes accept top-level
+  .py files plus requirements.txt.
+- Chassis-owned paths are silently dropped if the LLM tries to write them.
+  JS: app/layout.tsx + app/globals.css. Python: README.md + .gitignore.
+- A substrate-specific required entry point must be present in the
+  validated set. JS: app/page.tsx. Python: app.py. Without it the build
   has no entry point; we surface this as a JSON error to trigger retry.
+
+Bundle H: Python archetypes (ai_generator, ai_agent) route through this
+generator the same way; substrate dispatch happens in _rules_for() via
+models.SUBSTRATE_BY_ARCHETYPE.
 """
 
 from __future__ import annotations
@@ -26,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -34,52 +40,90 @@ from .clients import openrouter
 from .config import get_settings
 from .layouts import LAYOUT_NAMES
 from .model_rotation import ModelChoice
-from .models import GeneratedFile, GeneratorOutput
+from .models import SUBSTRATE_BY_ARCHETYPE, GeneratedFile, GeneratorOutput
 
 log = logging.getLogger(__name__)
 
 GENERATOR_TEMPERATURE = 0.7  # see ANTI_PATTERNS.md rule 4
 _MAX_TOKENS = 12000  # raised from 8k for multi-file output
-_REQUIRED_PATH = "app/page.tsx"
 
-ALLOWED_PATH_PREFIXES: tuple[str, ...] = ("app/", "lib/")
-ALLOWED_EXTENSIONS: tuple[str, ...] = (".ts", ".tsx", ".css")
-# Files the chassis owns. The LLM cannot overwrite these — chassis wins.
-# layout.tsx carries the Vibe Mill footer (rule 10), and globals.css holds
-# the Tailwind directives.
-CHASSIS_OWNED_PATHS: frozenset[str] = frozenset({
-    "app/layout.tsx",
-    "app/globals.css",
-})
+
+@dataclass(frozen=True)
+class SubstrateRules:
+    """Per-substrate file-path policy. The generator dispatches by archetype
+    to either JS_RULES (Next.js apps) or PYTHON_RULES (Gradio apps)."""
+    required_path: str
+    allowed_path_prefixes: tuple[str, ...]   # empty = top-level only
+    allowed_extensions: tuple[str, ...]
+    allowed_basenames: frozenset[str]        # explicit allowlist (e.g. requirements.txt)
+    chassis_owned: frozenset[str]
+
+
+JS_RULES = SubstrateRules(
+    required_path="app/page.tsx",
+    allowed_path_prefixes=("app/", "lib/"),
+    allowed_extensions=(".ts", ".tsx", ".css"),
+    allowed_basenames=frozenset(),
+    # layout.tsx carries the Vibe Mill footer (ANTI_PATTERNS rule 10),
+    # and globals.css holds the Tailwind directives.
+    chassis_owned=frozenset({"app/layout.tsx", "app/globals.css"}),
+)
+
+PYTHON_RULES = SubstrateRules(
+    required_path="app.py",
+    allowed_path_prefixes=(),  # top-level files only for the Gradio shape
+    allowed_extensions=(".py",),
+    # The LLM produces requirements.txt with the gradio pin + any extra deps.
+    allowed_basenames=frozenset({"requirements.txt"}),
+    # README.md carries HF Spaces metadata (sdk, python_version, etc.) which
+    # is load-bearing per the Bundle H test findings. Chassis pins it.
+    chassis_owned=frozenset({"README.md", ".gitignore"}),
+)
+
+
+def _rules_for(archetype: str) -> SubstrateRules:
+    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+        return PYTHON_RULES
+    return JS_RULES
 
 
 class GeneratorJSONError(RuntimeError):
     """Both generator attempts produced unparseable JSON or invalid output."""
 
 
-def _is_valid_slot_path(path: str) -> tuple[bool, str | None]:
-    """(ok, reason_if_not). Strict path validation for slot files."""
+def _is_valid_slot_path(path: str, rules: SubstrateRules) -> tuple[bool, str | None]:
+    """(ok, reason_if_not). Strict path validation against the substrate rules."""
     if not path or path.startswith("/") or "\\" in path:
         return False, "path must be relative, no backslashes"
     parts = path.split("/")
     if ".." in parts:
         return False, "path traversal not allowed"
-    if not any(path.startswith(p) for p in ALLOWED_PATH_PREFIXES):
-        return False, f"path must start with {ALLOWED_PATH_PREFIXES}"
-    if not any(path.endswith(e) for e in ALLOWED_EXTENSIONS):
-        return False, f"file extension must be one of {ALLOWED_EXTENSIONS}"
+    # Explicit basename allowlist (e.g. requirements.txt) bypasses
+    # prefix/extension checks.
+    basename = parts[-1]
+    if basename in rules.allowed_basenames and len(parts) == 1:
+        return True, None
+    if rules.allowed_path_prefixes:
+        if not any(path.startswith(p) for p in rules.allowed_path_prefixes):
+            return False, f"path must start with {rules.allowed_path_prefixes} or be one of {sorted(rules.allowed_basenames)}"
+    else:
+        # No prefixes allowed: must be top-level.
+        if len(parts) != 1:
+            return False, "path must be top-level (no subdirectories)"
+    if not any(path.endswith(e) for e in rules.allowed_extensions):
+        return False, f"file extension must be one of {rules.allowed_extensions}"
     return True, None
 
 
-def _filter_files(files: list[GeneratedFile]) -> list[GeneratedFile]:
+def _filter_files(files: list[GeneratedFile], rules: SubstrateRules) -> list[GeneratedFile]:
     """Drop chassis-owned and invalid paths. Last-write-wins for duplicates.
     Logs every drop with a reason so the operator can see what the LLM tried."""
     by_path: dict[str, GeneratedFile] = {}
     for f in files:
-        if f.path in CHASSIS_OWNED_PATHS:
+        if f.path in rules.chassis_owned:
             log.warning("dropping LLM file %s: chassis owns this path", f.path)
             continue
-        ok, reason = _is_valid_slot_path(f.path)
+        ok, reason = _is_valid_slot_path(f.path, rules)
         if not ok:
             log.warning("dropping LLM file %s: %s", f.path, reason)
             continue
@@ -89,13 +133,13 @@ def _filter_files(files: list[GeneratedFile]) -> list[GeneratedFile]:
     return list(by_path.values())
 
 
-def _validate_output(out: GeneratorOutput) -> GeneratorOutput:
-    """Filter out invalid/chassis-owned files; require app/page.tsx.
-    Returns a sanitized GeneratorOutput; raises ValueError if the required
-    entry-point file is missing after filtering."""
-    valid = _filter_files(out.files)
-    if not any(f.path == _REQUIRED_PATH for f in valid):
-        raise ValueError(f"output missing required {_REQUIRED_PATH}")
+def _validate_output(out: GeneratorOutput, rules: SubstrateRules) -> GeneratorOutput:
+    """Filter out invalid/chassis-owned files; require the substrate's entry
+    point. Returns a sanitized GeneratorOutput; raises ValueError if the
+    required entry-point file is missing after filtering."""
+    valid = _filter_files(out.files, rules)
+    if not any(f.path == rules.required_path for f in valid):
+        raise ValueError(f"output missing required {rules.required_path}")
     return GeneratorOutput(files=valid)
 
 
@@ -215,12 +259,18 @@ def _call(messages: list[dict], *, model: ModelChoice, app_id: str | None) -> st
     return completion.text or ""
 
 
-def _parse(text: str) -> GeneratorOutput:
+def _parse(text: str, rules: SubstrateRules) -> GeneratorOutput:
     """Parse JSON, validate against schema, filter paths, require entry point.
     Raises (JSONDecodeError | ValueError | ValidationError) on any failure."""
     raw = _extract_json(text)
     parsed = GeneratorOutput.model_validate(raw)
-    return _validate_output(parsed)
+    return _validate_output(parsed, rules)
+
+
+def validate_output(out: GeneratorOutput, archetype: str) -> GeneratorOutput:
+    """Public wrapper: validate against the rules for `archetype`. Used by
+    verify.py to defensively re-validate the verifier's file list."""
+    return _validate_output(out, _rules_for(archetype))
 
 
 _BLEND_CONTEXT_TEMPLATE = (
@@ -293,14 +343,16 @@ def generate(
             + "\n\nFix the issue and produce the same JSON structure again."
         )
 
+    rules = _rules_for(archetype)
     log.info(
-        "generator prompt: model=%s reasoning=%s archetype=%s layout=%s tier=%s blend=%s chars=%d",
-        model.slug, model.reasoning_effort, archetype, layout, tier, blend_partner,
-        len(user_prompt),
+        "generator prompt: model=%s reasoning=%s archetype=%s substrate=%s layout=%s tier=%s blend=%s chars=%d",
+        model.slug, model.reasoning_effort, archetype,
+        SUBSTRATE_BY_ARCHETYPE.get(archetype, "js"),
+        layout, tier, blend_partner, len(user_prompt),
     )
     text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
     try:
-        return _parse(text)
+        return _parse(text, rules)
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         log.warning("generator: invalid output, retrying once: %s | text=%r", exc, text[:300])
 
@@ -309,11 +361,11 @@ def generate(
         + "\n\nYour previous output was invalid:\n"
         + text[:1500]
         + "\n\nReturn the JSON object only with the documented schema. "
-        "Make sure 'files' is a list and includes at minimum app/page.tsx."
+        f"Make sure 'files' is a list and includes at minimum {rules.required_path}."
     )
     text2 = _call([{"role": "user", "content": retry_prompt}], model=model, app_id=app_id)
     try:
-        return _parse(text2)
+        return _parse(text2, rules)
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         log.error("generator: second parse failure: %s | text=%r", exc, text2[:300])
         raise GeneratorJSONError("generator failed to produce valid output after retry") from exc

@@ -42,14 +42,17 @@ TRACKER = "tracker"
 # Archetypes the orchestrator can actually build apps for. Expand as new
 # chassis + prompt template pairs are added (see archetypes/ and
 # prompts/generator/). Bundle F: tracker + chatbot + utility_tool +
-# search_directory. Future bundles add ai_generator, ai_agent, game,
-# marketplace, map_visualizer, glorified_todo, glorified_social,
-# recommendation_engine, parody_ui.
+# search_directory. Bundle H adds ai_generator + ai_agent on the Python
+# rail (Gradio on HF Spaces). Future bundles add game, marketplace,
+# map_visualizer, glorified_todo, glorified_social, recommendation_engine,
+# parody_ui.
 _V0_BUILDABLE: frozenset[str] = frozenset({
     "tracker",
     "chatbot",
     "utility_tool",
     "search_directory",
+    "ai_generator",   # Bundle H: Gradio + HF Spaces
+    "ai_agent",       # Bundle H: Gradio + HF Spaces
 })
 
 # Bundle G: blend rules.

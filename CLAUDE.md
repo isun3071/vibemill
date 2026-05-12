@@ -1,5 +1,7 @@
 # Vibe Mill
 
+> **Changelog v5 (Bundle H):** Python rail. Two new buildable archetypes (`ai_generator`, `ai_agent`) ship as Gradio apps on Hugging Face Spaces instead of Next.js on Vercel. Per-archetype substrate map in `models.SUBSTRATE_BY_ARCHETYPE` drives generator, security, deploy, retire, README writer, and public site. Generated AI apps use bring-your-own-key (reader sets `OPENAI_API_KEY` in the Space's secrets) — broken-until-keyed AI demos are load-bearing satire (genre-authentic for HF Spaces hackathon output). New schema columns: `apps.deploy_target` and `apps.hf_space_url` (migration 010). HF token + username configured via `HF_TOKEN` and `HF_USERNAME` env vars.
+
 > **Changelog v4:** Removed ANTI_PATTERNS rules 11 (no runtime fetching), 12 (no persistent storage), and 13 (no parallel instances) along with their references in this file. Generated apps may now use `fetch()`, `localStorage`, etc. — broken/flaky network paths are on-brand for the genre. Static analysis still enforces pre-existing safety patterns (`eval`, `child_process`, etc.); SECURITY_ADDITIONS.md is gone.
 
 > **Changelog v3:** Updated cadence to every-4-hours (was hourly). Updated thesis epigraph to the more recent Karpathy quote.

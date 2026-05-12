@@ -1,7 +1,8 @@
 """Operator CLI. Used by the `vibemill` script entry point and by
 `python -m vibemill <command>`.
 
-Commands: status, rotate, retire, smoke-test.
+Commands: status, rotate, retire, smoke-test, reset-daily-cost,
+rescreenshot, audit.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ def rotate_cmd() -> None:
     for o in outcomes:
         console.print(
             f"retired {o.app_id}: github_archived={o.github_archived} "
-            f"vercel_deleted={o.vercel_deleted}"
+            f"deploy_deleted={o.deploy_deleted}"
         )
 
 
@@ -65,7 +66,7 @@ def retire_cmd(app_id: str) -> None:
         sys.exit(1)
     console.print(
         f"retired {outcome.app_id}: github_archived={outcome.github_archived} "
-        f"vercel_deleted={outcome.vercel_deleted}"
+        f"deploy_deleted={outcome.deploy_deleted}"
     )
 
 
@@ -137,6 +138,75 @@ def reset_daily_cost_cmd(yes: bool) -> None:
         reason=f"deleted {deleted} llm_calls rows totaling ~${cost:.4f}",
     )
     console.print(f"reset: deleted {deleted} llm_calls rows for today")
+
+
+@cli.command("rescreenshot")
+@click.option(
+    "--app-id", default=None,
+    help="Re-screenshot a single app by id (default: all live apps).",
+)
+@click.option(
+    "--no-disable-sso", is_flag=True,
+    help="Skip the per-project SSO-disable PATCH (use when team-wide protection is already off).",
+)
+def rescreenshot_cmd(app_id: str | None, no_disable_sso: bool) -> None:
+    """Re-capture screenshots for live apps. Optionally clears Vercel SSO
+    protection on each project first so Playwright sees the actual app and
+    not the login wall."""
+    from . import screenshot
+    from .clients import supabase as sb_client, vercel
+
+    apps = (
+        [db.get_app(app_id)] if app_id else db.list_live_apps_oldest_first()
+    )
+    apps = [a for a in apps if a is not None and a.vercel_url]
+    if not apps:
+        console.print("no matching live apps")
+        return
+
+    ok = sso_failed = capture_failed = upload_failed = 0
+    for a in apps:
+        project_name = (a.github_url or "").rstrip("/").rsplit("/", 1)[-1]
+        if not project_name:
+            console.print(f"[yellow]{a.id}: no project name derivable; skipping[/yellow]")
+            continue
+
+        if not no_disable_sso:
+            try:
+                vercel.disable_sso_protection(project_name)
+            except Exception as exc:
+                console.print(f"[yellow]{a.id} ({project_name}): sso disable failed: {exc}[/yellow]")
+                sso_failed += 1
+                # Try the screenshot anyway; team-wide may already be off.
+
+        try:
+            shot = screenshot.capture(app_id=a.id, url=a.vercel_url)
+        except Exception as exc:
+            console.print(f"[red]{a.id}: capture failed: {exc}[/red]")
+            capture_failed += 1
+            continue
+
+        try:
+            url = sb_client.upload_screenshot(a.id, shot.jpeg_bytes)
+        except Exception as exc:
+            console.print(f"[red]{a.id}: upload failed: {exc}[/red]")
+            upload_failed += 1
+            continue
+
+        db.update_app(a.id, screenshot_path=url, screenshot_status="captured")
+        console.print(f"[green]{a.id}[/green] ({project_name})")
+        ok += 1
+
+    audit.event(
+        operator=audit.CLI,
+        operation="rescreenshot.batch",
+        target=None,
+        reason=f"ok={ok} sso_failed={sso_failed} capture_failed={capture_failed} upload_failed={upload_failed}",
+    )
+    console.print(
+        f"\nrescreenshot: ok={ok} sso_failed={sso_failed} "
+        f"capture_failed={capture_failed} upload_failed={upload_failed}"
+    )
 
 
 @cli.command("audit")

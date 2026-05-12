@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     VERCEL_TOKEN: SecretStr = SecretStr("")
     VERCEL_TEAM_ID: str = ""
 
+    # Hugging Face Spaces (Bundle H: Python rail for Gradio AI archetypes).
+    # HF_USERNAME is the account or org under which Spaces are created.
+    # No org used in V0; defaults to the personal account.
+    HF_TOKEN: SecretStr = SecretStr("")
+    HF_USERNAME: str = ""
+
     # Supabase
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_ROLE_KEY: SecretStr = SecretStr("")

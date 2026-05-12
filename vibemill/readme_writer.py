@@ -30,8 +30,35 @@ from pathlib import Path
 from .clients import openrouter
 from .config import get_settings
 from .model_rotation import ModelChoice
+from .models import SUBSTRATE_BY_ARCHETYPE
 
 log = logging.getLogger(__name__)
+
+
+# Bundle H: substrate-aware preface injected before the persona template
+# so the LLM doesn't default to Next.js / npm boilerplate for Python apps.
+# The persona templates themselves still mention Next.js; this override
+# wins because it's later in the prompt and more specific.
+_PYTHON_SUBSTRATE_PREFACE = (
+    "SUBSTRATE OVERRIDE (Bundle H):\n"
+    "This app is a Python Gradio app deployed on Hugging Face Spaces - "
+    "NOT a Next.js / TypeScript / Tailwind app. Adapt the README accordingly:\n"
+    "- Tech stack: Python, Gradio, plus whichever LLM SDK the app uses "
+    "(openai, anthropic, etc.). Do NOT mention Next.js, TypeScript, "
+    "Tailwind, React, or npm.\n"
+    "- Install block: `pip install -r requirements.txt` (NOT npm install).\n"
+    "- Run block: `python app.py` (NOT npm run dev).\n"
+    "- Inference: the app uses bring-your-own-key. The reader sets "
+    "OPENAI_API_KEY (or ANTHROPIC_API_KEY) in the Space's Settings -> "
+    "Secrets. Without the key, the UI loads but inference returns a "
+    "placeholder error string.\n"
+    "- The chassis README already has a YAML frontmatter block with HF "
+    "Spaces metadata (sdk, python_version, sdk_version, app_file). DO "
+    "NOT produce another YAML frontmatter block at the top of your "
+    "output; your content goes AFTER the existing frontmatter.\n"
+    "- The voice and section structure described below still apply; "
+    "swap the substrate details only.\n\n"
+)
 
 # (persona_name, weight). Weights must sum to 1.0.
 # Bundle E rebalanced and added 5 new personas (12 total). The new five
@@ -119,9 +146,15 @@ def write(
         archetype=archetype,
         source_headline=source_headline,
     )
+    # Bundle H: prepend the Python substrate override after the persona
+    # template so the LLM swaps Next.js/npm specifics for Gradio/pip ones.
+    # The persona's voice and section structure are still followed.
+    if SUBSTRATE_BY_ARCHETYPE.get(archetype) == "python":
+        user_prompt = user_prompt + "\n\n" + _PYTHON_SUBSTRATE_PREFACE
     log.info(
-        "readme prompt: model=%s persona=%s app_name=%s chars=%d",
-        model.slug, persona, app_name, len(user_prompt),
+        "readme prompt: model=%s persona=%s app_name=%s substrate=%s chars=%d",
+        model.slug, persona, app_name,
+        SUBSTRATE_BY_ARCHETYPE.get(archetype, "js"), len(user_prompt),
     )
     completion = openrouter.complete(
         model=model.slug,

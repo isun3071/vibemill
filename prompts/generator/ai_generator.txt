@@ -1,0 +1,112 @@
+You are generating a Python Gradio app for Hugging Face Spaces — an AI
+GENERATOR archetype. Examples: an AI haiku writer, a story-from-prompt
+generator, an icon generator (text-to-image via API), a logo-tagline
+generator, a meme caption generator, an AI debate-prompt generator, an
+"AI roast my resume" tool, a song-title generator, a startup-name
+generator, a fake-quote generator with vibey provenance, an AI
+"describe-this-image" toy, an AI cocktail-recipe inventor.
+
+The user types or uploads ONE input. The app calls an LLM (or image
+model) once with that input, prompts a creative riff, and displays the
+output. Single-shot generation, no chat history.
+
+VISUAL TREATMENT:
+A Gradio Interface or Blocks layout. One input control (Textbox /
+File / Image / Slider, as fits), one output control (Textbox / Image /
+Audio). Optional examples beneath the input to show what the tool does.
+Title at the top in gr.Markdown — the tool's name and a one-sentence
+description. The aesthetic is the Gradio default; lean into it. HF
+Spaces UI wraps the app with its own chrome — that's fine, on-brand.
+
+Context:
+- Prompt: {{prompt}}
+- News source: {{source_url}}
+- News headline: {{source_headline}}
+- News summary: {{source_summary}}
+
+If a "Source material from web search" block appears at the bottom of
+this prompt, treat those snippets as factual foundation for default
+example inputs. The named-attribution constraint applies regardless of
+whether sources are present.
+
+A chassis provides the HF Spaces metadata in README.md (sdk, python_version,
+sdk_version, app_file). You DO NOT produce README.md — chassis owns it.
+
+OUTPUT SCHEMA (JSON only, single object):
+
+{
+  "files": [
+    { "path": "app.py", "content": "..." },
+    { "path": "requirements.txt", "content": "..." },
+    ... more .py files as appropriate ...
+  ]
+}
+
+{{file_count_guidance}}
+
+PATH RULES (Python rail):
+- Files must be top-level (no subdirectories).
+- "app.py" is REQUIRED — the Gradio app entry point. HF Spaces' app_file
+  pointer in README.md targets it.
+- "requirements.txt" is REQUIRED — pin gradio>=5.15,<6 as the FIRST line.
+  Add other deps as needed (openai, anthropic, requests, Pillow, etc.).
+  Do NOT pin huggingface_hub — let pip resolve a compatible version.
+- Other allowed: top-level *.py helper modules (e.g. utils.py, prompts.py).
+- No README.md, no .gitignore — chassis owns those.
+
+BRING-YOUR-OWN-KEY (genre-load-bearing):
+This is the satirical core for the Python rail. Do NOT bake an API key
+into the code. Read it from environment at call time:
+
+    import os
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+If the key is missing when the user clicks Generate, return a polite
+error string in the output ("set OPENAI_API_KEY in this Space's secrets
+to enable inference" or similar). The UI must still load and the
+button must still respond — the failure is at inference time, not
+import time. This pattern matches how real HF Spaces AI demos work in
+practice. Do NOT add a UI for entering the key inline.
+
+Pick OpenAI by default unless the headline suggests a different
+provider. Use the modern OpenAI SDK style:
+
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": user_text}],
+    )
+    return resp.choices[0].message.content
+
+For image generation use client.images.generate() and return the URL or
+the PIL image. For Anthropic, use the anthropic SDK with similar shape.
+Wrap the API call in try/except and return a readable error string on
+failure (no traceback to the UI).
+
+Constraints (the only hard rules):
+- The app must IMPORT without errors. Syntax errors fail the static check.
+- gr.Interface(...).launch() OR gr.Blocks() ... demo.launch() at the bottom
+  inside a `if __name__ == "__main__":` block — HF Spaces runs app.py as
+  the main module.
+- Read API keys from os.getenv at call time, not at module import.
+- Hardcoded examples are fine and on-brand. Real data via web search
+  results (if present) is preferred for example inputs.
+- When the tool references quotes, statements, or attributions:
+  - Do NOT attribute fabricated quotes to specific named real people
+  - Do NOT fabricate specific bill numbers, case numbers, dollar amounts
+    attributed to real people or named institutions
+  - Generic role references are fine ("a senator", "an analyst")
+
+Interactivity for AI GENERATOR:
+**Real Gradio interactivity, not a static page.** Required: clicking
+the action button calls the function and either renders output or
+returns the no-key error string. The function signature matches the
+Gradio components (str → str for text→text, image → str for caption,
+etc.). At least 2 working examples wired via gr.Interface(examples=[...])
+or equivalent in Blocks. Optional polish: a system-prompt textbox the
+user can edit, a temperature slider, a "regenerate" button, formatted
+output (Markdown, code blocks).
+
+Output the JSON object only. No prose before or after.
