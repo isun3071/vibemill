@@ -21,7 +21,7 @@ export function Footer() {
             linkedin
           </a>
           <a
-            href="https://iansun.dev"
+            href="https://isun3071.github.io"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-ink dark:hover:text-moon transition-colors"
