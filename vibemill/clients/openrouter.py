@@ -12,6 +12,7 @@ the documented courtesy to OpenRouter's recommended <=1 req/sec.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -33,6 +34,25 @@ log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 60
 _PAUSE_AFTER_CALL_S = 0.1
+_HEARTBEAT_INTERVAL_S = 60.0
+
+
+def _heartbeat_loop(
+    stop: threading.Event,
+    *,
+    model: str,
+    purpose: LlmPurpose,
+    started: float,
+) -> None:
+    # Tells the user the call has not hung. Sleeps in one chunk per beat;
+    # stop.wait returns True when the request finishes so the thread exits
+    # without logging again.
+    while not stop.wait(_HEARTBEAT_INTERVAL_S):
+        elapsed = int(time.perf_counter() - started)
+        log.info(
+            "openrouter %s model=%s still waiting (%ds elapsed)",
+            purpose, model, elapsed,
+        )
 
 
 class OpenRouterError(RuntimeError):
@@ -85,11 +105,22 @@ def _record(
     retry=retry_if_exception_type((OpenRouterError, httpx.TransportError)),
 )
 def _post_chat(
-    *, model: str, messages: list[dict[str, Any]], opts: dict[str, Any]
+    *,
+    model: str,
+    messages: list[dict[str, Any]],
+    opts: dict[str, Any],
+    purpose: LlmPurpose,
 ) -> tuple[dict[str, Any], int]:
     s = get_settings()
     payload: dict[str, Any] = {"model": model, "messages": messages, **opts}
     started = time.perf_counter()
+    stop = threading.Event()
+    beat = threading.Thread(
+        target=_heartbeat_loop,
+        kwargs={"stop": stop, "model": model, "purpose": purpose, "started": started},
+        daemon=True,
+    )
+    beat.start()
     try:
         r = httpx.post(
             f"{s.OPENROUTER_BASE_URL}/chat/completions",
@@ -101,6 +132,7 @@ def _post_chat(
             timeout=_TIMEOUT_S,
         )
     finally:
+        stop.set()
         time.sleep(_PAUSE_AFTER_CALL_S)
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     if r.status_code >= 500 or r.status_code == 429:
@@ -145,7 +177,9 @@ def complete(
     )
 
     try:
-        body, elapsed_ms = _post_chat(model=model, messages=messages, opts=opts)
+        body, elapsed_ms = _post_chat(
+            model=model, messages=messages, opts=opts, purpose=purpose
+        )
     except (OpenRouterError, httpx.TransportError, RetryError) as exc:
         # Record the failure with zero cost and tokens so the ledger reflects
         # an attempt was made. Re-raise so the caller can decide what to do.

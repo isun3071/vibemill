@@ -228,8 +228,31 @@ _TIER_FILE_GUIDANCE: dict[str, str] = {
         "demoable end-to-end, pitch-deck-with-repo shaped. This is the "
         "artifact someone would actually show off at Demo Day. Real data, "
         "real interactivity, real componentization, real care. This team "
-        "didn't sleep, and it shows — coherent across files, considered "
+        "didn't sleep, and it shows: coherent across files, considered "
         "in its choices, the kind of project that wins Best Overall.\n\n"
+        "BANGER DISTINGUISHER REQUIREMENT (Bundle K): a median Devpost "
+        "submission of this archetype is forgettable. A top-5% banger has "
+        "ONE killer feature that distinguishes it from the rest of the "
+        "pile. Pick that feature for THIS app, based on its specific "
+        "premise and audience. Implement it end-to-end, not stubbed. It "
+        "must be DISCOVERABLE within 30 seconds of clicking around (not "
+        "buried in a settings menu). Lean on what you know from training "
+        "on top hackathon projects: what makes Best Overall winners "
+        "actually win.\n"
+        "DO NOT pick: dark mode, a generic 'about' page, a chatbot (unless "
+        "the archetype is chatbot), a stats counter, or a 'powered by' "
+        "badge. These are the lowest-effort distinguishers and they read "
+        "as such.\n"
+        "DO pick (examples; choose whichever ACTUALLY fits this app, or "
+        "find something better): a non-obvious search affordance "
+        "(semantic, fuzzy, by-tag, by-emoji), a delightful keyboard or "
+        "drag interaction, an export/share flow (PDF, public permalink, "
+        "tweet generator), a view-mode toggle that reveals the data "
+        "differently (list/grid/calendar/map/kanban), a guided onboarding "
+        "in 3 clicks, a compare-two-items mode, a smart empty state with "
+        "sample data and suggestions, an undo/redo stack, a 'permalink to "
+        "this filtered view', a CSV import. ONE feature. Not three. "
+        "Choose deliberately and execute it cleanly.\n\n"
         "FILE COUNT: produce 4 to 8 files. Required: app/page.tsx and "
         "lib/data.ts. Factor the page into multiple distinct components in "
         "lib/components/, with each file owning one cohesive UI piece. "
@@ -420,3 +443,59 @@ def generate(
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         log.error("generator: second parse failure: %s | text=%r", exc, text2[:300])
         raise GeneratorJSONError("generator failed to produce valid output after retry") from exc
+
+
+def _render_previous_files(prev: GeneratorOutput) -> str:
+    """Render the previous generator output as a delimited block for the
+    polish prompt. Each file framed so the LLM can see boundaries clearly."""
+    parts = []
+    for f in prev.files:
+        parts.append(f"=== FILE: {f.path} ===\n{f.content}\n")
+    return "\n".join(parts)
+
+
+def polish_for_banger(
+    *,
+    previous: GeneratorOutput,
+    archetype: str,
+    prompt: str,
+    source_headline: str,
+    model: ModelChoice,
+    layout: str | None = None,
+    app_id: str | None = None,
+) -> GeneratorOutput:
+    """Bundle K Lever 3: second-pass polish for banger-tier generations.
+
+    Takes a functional first-pass output and asks the model to add ONE
+    visible improvement on top of the distinguisher the first pass already
+    picked. Returns the polished output, or raises GeneratorJSONError on
+    parse failure (caller should fall back to `previous`).
+
+    The polish prompt explicitly requires the complete file set in the
+    same JSON schema. Path rules from the first pass still apply via
+    `_rules_for(archetype)`.
+    """
+    settings = get_settings()
+    polish_path = settings.prompts_dir / "generator" / "polish.txt"
+    template = polish_path.read_text()
+    user_prompt = (
+        template
+        .replace("{{archetype}}", archetype)
+        .replace("{{prompt}}", prompt)
+        .replace("{{source_headline}}", source_headline)
+        .replace("{{previous_files}}", _render_previous_files(previous))
+    )
+    rules = _rules_for(archetype)
+    log.info(
+        "polish prompt: model=%s reasoning=%s archetype=%s layout=%s chars=%d",
+        model.slug, model.reasoning_effort, archetype, layout, len(user_prompt),
+    )
+    text = _call([{"role": "user", "content": user_prompt}], model=model, app_id=app_id)
+    try:
+        return _parse(text, rules)
+    except (json.JSONDecodeError, ValueError, ValidationError) as exc:
+        log.warning(
+            "polish: parse failure, falling back to pre-polish output: %s | text=%r",
+            exc, text[:300],
+        )
+        raise GeneratorJSONError("polish pass failed to produce valid output") from exc

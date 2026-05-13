@@ -120,7 +120,7 @@ def _extract_yaml_frontmatter(text: str) -> str | None:
     return text[: end + len("\n---")]
 
 
-def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
+def _stage(chassis: Path, *, files: list, readme_md: str, mlh_md: str | None = None) -> Path:
     """Bundle D: write the LLM's full file list into a fresh chassis copy.
 
     Bundle H: preserve HF Spaces YAML frontmatter from the chassis README;
@@ -140,6 +140,8 @@ def _stage(chassis: Path, *, files: list, readme_md: str) -> Path:
         readme_path.write_text(f"{fm}\n\n{readme_md or ''}")
     else:
         readme_path.write_text(readme_md or "")
+    if mlh_md is not None:
+        (work / "mlh.md").write_text(mlh_md)
     return work
 
 
@@ -211,6 +213,14 @@ def _run_happy_pipeline(
         persona=smoke_persona,
         app_id=f"smoke-{fixture}",
     )
+    mlh = readme_writer.write_mlh(
+        app_name=f"smoke-test-{archetype}",
+        prompt=prompt,
+        archetype=archetype,
+        source_headline=item.headline,
+        model=smoke_model,
+        app_id=f"smoke-{fixture}",
+    )
 
     work: Path | None = None
     build_seconds = 0
@@ -250,7 +260,7 @@ def _run_happy_pipeline(
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
         log.info("[%s] 7/10 stage chassis (attempt %d, %d files)", fixture, attempt, len(v_out.output.files))
-        work = _stage(chassis, files=v_out.output.files, readme_md=readme)
+        work = _stage(chassis, files=v_out.output.files, readme_md=readme, mlh_md=mlh)
 
         log.info("[%s] 8/10 build check (attempt %d)", fixture, attempt)
         started = time.monotonic()

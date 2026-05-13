@@ -97,7 +97,7 @@ ArchetypeName = Literal[
 ]
 
 GuardDecision = Literal["pass", "reject"]
-LlmPurpose = Literal["guard", "matcher", "generator", "readme", "name", "search", "synthetic_prompt"]
+LlmPurpose = Literal["guard", "matcher", "generator", "readme", "mlh", "name", "search", "synthetic_prompt"]
 AppStatus = Literal["live", "archived", "stillborn", "viral"]
 DeathCause = Literal["rotation", "manual", "never_built"]
 RejectionStage = Literal["guard", "matcher"]

@@ -1,0 +1,70 @@
+You previously generated a hackathon app at the banger tier. The first
+pass builds and is functional. Your job now is a POLISH PASS: take the
+generated app and lift it from "median submission that already attempted
+a distinguisher" to "the version someone walks past at Demo Day and
+doubles back to look at again."
+
+CONTEXT:
+- Archetype: {{archetype}}
+- Original brief: {{prompt}}
+- News context: {{source_headline}}
+
+PREVIOUS OUTPUT (functional, attempted a distinguisher in the first pass,
+but still reads as median-or-slightly-above):
+
+{{previous_files}}
+
+POLISH TASK:
+This is the second pass. The first pass already picked one distinguishing
+feature. What's STILL missing that would make this conspicuously top-5%
+rather than top-30%? Pick ONE additional improvement and add it. Examples
+of what "polish" means at this layer:
+
+- A UX flourish that's small but lands: a subtle animation on a key
+  interaction, a hover state that reveals useful info, a smart focus
+  flow on form submit, a loading state that doesn't suck.
+- A copywriting pass: the labels, empty states, button text, error
+  messages all read as if a careful writer touched them. No "Lorem
+  ipsum", no generic "Submit" buttons where a verb would help.
+- A secondary interaction that elevates the primary one: undo/redo,
+  keyboard shortcuts that ACTUALLY work (with a discoverable hint), a
+  bulk-action menu when items are multi-selected.
+- A demo-flow improvement: the first thing the user sees is compelling
+  (not an empty CRUD form), the happy path completes in 3 clicks or
+  less, the "wow" moment lands within the first 10 seconds.
+- A specificity pass on the data: the placeholder content is not
+  obviously placeholder (no "User 1", "Item A"); the seed data reflects
+  the app's premise and feels chosen, not random.
+- A visual hierarchy fix: the page has one clear primary action, a
+  considered secondary, and the rest recedes. Not five buttons all
+  competing.
+
+CONSTRAINTS:
+- Pick ONE improvement. Not three. Not a kitchen-sink pass. ONE.
+- It must be VISIBLE from clicking around the app. Not in a config
+  file, not in a comment, not in a code-quality refactor that has no
+  user-visible effect.
+- The improvement must NOT break the existing distinguisher from the
+  first pass. Build on top of it; do not replace it.
+- DO NOT add dark mode. DO NOT add a generic "about" page. DO NOT add
+  a chatbot. These were already disallowed in the first pass.
+- The output must STILL build. If your improvement requires a new
+  dependency, add it to package.json / requirements.txt as appropriate.
+- All path rules from the first pass still apply.
+
+OUTPUT SCHEMA:
+Return the COMPLETE file set in the same JSON format as the first pass:
+
+{
+  "files": [
+    { "path": "...", "content": "..." },
+    ...
+  ]
+}
+
+Include unchanged files unchanged. Include modified files with the
+improvement applied. Do not omit files; if a file existed in the
+previous output, it must exist in your output (either unchanged or
+modified).
+
+Output the JSON object only. No prose before or after.

@@ -1,8 +1,9 @@
-You are writing a README.md for a small Next.js app submitted to a
-college hackathon on Devpost. Voice: the MLH-template-filled-in-at-4am
-voice. The kind of README a hackathon team writes when they realize at
-3:55am that submissions close at 4:00am and they need to fill in the
-template's section headers literally.
+You are writing the Devpost submission text (mlh.md) for a small app
+submitted to a college hackathon on Devpost. Voice: the MLH-template-
+filled-in-at-4am voice. The kind of pitch a hackathon team writes when
+they realize at 3:55am that submissions close at 4:00am and they need
+to fill in the template's section headers literally. (The technical
+stack baseline is specified later in this prompt; do not assume Next.js.)
 
 Context:
 - App name: {{app_name}}
@@ -50,7 +51,8 @@ project (e.g. "we got it to deploy", "we learned React"). Earnest.
 implausible.
 
 ## Built with
-List of technologies (Next.js, TypeScript, Tailwind, Vercel, etc.).
+List of technologies. Use the stack baseline given later in this prompt,
+and feel free to add others.
 
 Subtle tells:
 - The cadence across sections is suspiciously uniform

@@ -14,12 +14,40 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from . import audit, db, retire as retire_mod
+from . import audit, db, matcher, retire as retire_mod
 from .config import get_settings
+from .models import SUBSTRATE_BY_ARCHETYPE
 
 
 console = Console()
 log = logging.getLogger(__name__)
+
+
+# Build the ship-one --archetype Choice list and the grouped-by-stack help
+# block at import time so click renders both in --help. The grouping
+# auto-syncs when new archetypes are added to V0_BUILDABLE.
+_SHIP_ONE_ARCHETYPES: list[str] = sorted(matcher.V0_BUILDABLE)
+
+
+def _grouped_archetypes_help() -> str:
+    groups: dict[str, list[str]] = {}
+    for name in _SHIP_ONE_ARCHETYPES:
+        stack = SUBSTRATE_BY_ARCHETYPE.get(name, "nextjs")
+        groups.setdefault(stack, []).append(name)
+    stack_targets = {
+        "nextjs": "Next.js / Vercel",
+        "gradio": "Gradio / HF Spaces",
+        "flask": "Flask / github_only",
+    }
+    lines = []
+    for stack in ("nextjs", "gradio", "flask"):
+        names = groups.get(stack, [])
+        if names:
+            lines.append(f"{stack_targets[stack]}: {', '.join(names)}")
+    return "\n".join(lines)
+
+
+_SHIP_ONE_HELP_BLOCK: str = _grouped_archetypes_help()
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -123,7 +151,7 @@ def reset_daily_cost_cmd(yes: bool) -> None:
     going within the same UTC day."""
     cost = db.today_cost_usd()
     if cost == 0.0:
-        console.print("today's cost ledger is already empty (\$0.0000); nothing to reset")
+        console.print("today's cost ledger is already empty ($0.0000); nothing to reset")
         return
     if not yes:
         click.confirm(
@@ -140,14 +168,26 @@ def reset_daily_cost_cmd(yes: bool) -> None:
     console.print(f"reset: deleted {deleted} llm_calls rows for today")
 
 
-@cli.command("ship-one")
+_SHIP_ONE_DOC: str = (
+    "Manually trigger ONE app ship with a forced archetype + tier.\n\n"
+    "Bypasses the matcher and tier dice so test runs are deterministic. The "
+    "rest of the pipeline (guard, generator, verifier, static analysis, "
+    "build, GitHub publish, deploy, screenshot, snapshot) runs normally "
+    "and produces a real artifact.\n\n"
+    "\b\nArchetypes by deploy rail:\n" + _SHIP_ONE_HELP_BLOCK
+)
+
+
+@cli.command("ship-one", help=_SHIP_ONE_DOC)
 @click.option(
     "--archetype", required=True,
-    help="Force the archetype (skips matcher dice). Must be in V0_BUILDABLE.",
+    type=click.Choice(_SHIP_ONE_ARCHETYPES),
+    help="Force the archetype (skips matcher dice). One of the buildable set.",
 )
 @click.option(
     "--tier", required=True, type=click.Choice(["slop", "mean_good", "banger"]),
-    help="Force the output tier (skips the tier roll).",
+    help="Force the output tier (skips the tier roll). slop=no reasoning, "
+         "mean_good=low reasoning, banger=medium reasoning.",
 )
 @click.option(
     "--prompt", default=None,
@@ -159,13 +199,6 @@ def reset_daily_cost_cmd(yes: bool) -> None:
     help="Skip the snapshot push at the end (debug use).",
 )
 def ship_one_cmd(archetype: str, tier: str, prompt: str | None, no_snapshot: bool) -> None:
-    """Manually trigger ONE app ship with a forced archetype + tier.
-
-    Bypasses the matcher and tier dice so test runs are deterministic. The
-    rest of the pipeline (guard, generator, verifier, static analysis,
-    build, GitHub publish, deploy, screenshot, snapshot) runs normally
-    and produces a real artifact.
-    """
     from datetime import datetime, timezone
     import secrets
     from . import __main__, matcher, synthetic_prompt, tracks

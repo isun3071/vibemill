@@ -122,6 +122,7 @@ def _stage_chassis(
     *,
     files: list,  # list[GeneratedFile]
     readme_md: str,
+    mlh_md: str | None = None,
 ) -> Path:
     """Copy the chassis into a tempdir, write each LLM-produced file, return
     the path. Bundle D: variable file list. Each file's path is chassis-
@@ -131,6 +132,10 @@ def _stage_chassis(
     (HF Spaces convention), the frontmatter is preserved and the persona-
     produced readme_md is appended after it. Otherwise readme_md replaces
     the README entirely (existing Next.js behavior).
+
+    Bundle J: if mlh_md is provided, write it to mlh.md at the repo root.
+    The mlh.md sidecar never gets the YAML frontmatter (that's HF-Spaces-
+    specific to README.md).
     """
     work = Path(tempfile.mkdtemp(prefix="vibemill-build-"))
     shutil.copytree(src_chassis, work, dirs_exist_ok=True)
@@ -145,6 +150,8 @@ def _stage_chassis(
         readme_path.write_text(f"{fm}\n\n{readme_md or ''}")
     else:
         readme_path.write_text(readme_md or "")
+    if mlh_md is not None:
+        (work / "mlh.md").write_text(mlh_md)
     return work
 
 
@@ -550,12 +557,21 @@ def _ship_one(
             persona=readme_persona,
             app_id=app_id,
         )
+        mlh_md = readme_writer.write_mlh(
+            app_name=app_id,
+            prompt=prompt,
+            archetype=archetype,
+            source_headline=item.headline,
+            model=readme_choice,
+            app_id=app_id,
+        )
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
         work = _stage_chassis(
             chassis_dir,
             files=verify_outcome.output.files,
             readme_md=readme_md,
+            mlh_md=mlh_md,
         )
 
         # Static analysis: hard policy gate. No retry on failure.
@@ -575,6 +591,56 @@ def _ship_one(
             break
         log.warning("%s: build failed (attempt %d): %s", app_id, attempt, output[:300])
         build_err = output
+
+    # Bundle K Lever 3: banger polish pass. After a successful build, ask
+    # the model to add ONE additional visible improvement on top of the
+    # distinguisher the first pass already picked. Safe fallback: if the
+    # polish output fails parse, static analysis, or build, the pre-polish
+    # work dir + gen_out remain in place and the original artifact ships.
+    if build_ok and tier == "banger" and gen_out is not None and verify_outcome is not None:
+        log.info("%s: banger polish pass starting", app_id)
+        try:
+            polished = generator.polish_for_banger(
+                previous=gen_out,
+                archetype=archetype,
+                prompt=prompt,
+                source_headline=item.headline,
+                model=gen_model,
+                layout=layout,
+                app_id=app_id,
+            )
+        except generator.GeneratorJSONError as exc:
+            log.warning("%s: polish parse failed, keeping pre-polish output: %s", app_id, exc)
+            polished = None
+
+        if polished is not None:
+            polished_work = _stage_chassis(
+                chassis_dir,
+                files=polished.files,
+                readme_md=readme_md,
+                mlh_md=mlh_md,
+            )
+            sa_polish = security.static_analysis(
+                {f.path: f.content for f in polished.files},
+            )
+            if not sa_polish.safe:
+                log.warning("%s: polish static analysis failed (%s); keeping pre-polish",
+                            app_id, sa_polish.reason)
+                shutil.rmtree(polished_work, ignore_errors=True)
+            else:
+                polish_ok, polish_out = _run_build_check(polished_work, archetype)
+                if polish_ok:
+                    log.info("%s: polish build ok, using polished output", app_id)
+                    shutil.rmtree(work, ignore_errors=True)
+                    work = polished_work
+                    gen_out = polished
+                    # verify_outcome's output.files is stale after polish but
+                    # downstream consumers read from work/ and gen_out, so the
+                    # files list on AppRecord (taken from gen_out) stays correct.
+                else:
+                    log.warning("%s: polish build failed; keeping pre-polish (err=%s)",
+                                app_id, polish_out[:300])
+                    shutil.rmtree(polished_work, ignore_errors=True)
 
     if forbidden_result is not None:
         elapsed = int((datetime.now(timezone.utc) - started).total_seconds())
