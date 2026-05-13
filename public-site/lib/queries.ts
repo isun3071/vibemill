@@ -56,21 +56,55 @@ const APP_COLUMNS =
 
 /** Latest live apps with a live URL on any rail, newest first.
  *  Bundle I: github_only apps don't have vercel_url or hf_space_url
- *  but DO have github_url; filter on that disjunction. */
-export async function getLiveApps(limit = 24): Promise<App[]> {
+ *  but DO have github_url; filter on that disjunction.
+ *  Supabase .range(from, to) is inclusive on both ends; offset is the
+ *  starting row, limit determines the slice size. */
+export async function getLiveApps(limit = 24, offset = 0): Promise<App[]> {
   const { data, error } = await supabase
     .from("apps")
     .select(APP_COLUMNS)
     .eq("status", "live")
     .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
   if (error) {
     console.error("[queries] getLiveApps:", error.message);
     return [];
   }
   return (data ?? []) as unknown as App[];
 }
+
+/** Total live-apps count, used by pagination math. */
+export async function getLiveAppsCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("apps")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "live")
+    .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null");
+  if (error) {
+    console.error("[queries] getLiveAppsCount:", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+/** Timestamp of the most recent shipped app, for the mill-status indicator
+ *  (active state + countdown). ISO string or null if none shipped yet. */
+export async function getLastShippedAt(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("apps")
+    .select("created_at")
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("[queries] getLastShippedAt:", error.message);
+    return null;
+  }
+  return (data?.created_at as string | undefined) ?? null;
+}
+
 
 /** Retired apps for the cemetery, newest-retired first. */
 export async function getRetiredApps(limit = 48): Promise<App[]> {

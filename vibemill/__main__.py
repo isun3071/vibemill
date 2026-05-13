@@ -720,6 +720,9 @@ def _ship_one(
             name=app_id,
             description=f"{item.headline} (Vibe Mill {datetime.now(timezone.utc):%Y-%m-%d})",
             src=work,
+            files=gen_out.files,
+            archetype=archetype,
+            tier=tier,
         )
     except Exception as exc:
         log.error("%s: github publish failed: %s", app_id, exc)

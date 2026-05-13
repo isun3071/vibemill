@@ -115,6 +115,8 @@ Future Claude Code may want to "tighten" these READMEs because they read as obvi
 
 The same applies to fake commit histories: the progressive shift from "initial commit" to "i don't know what this code does" is part of the bit. Do not normalize the messages.
 
+The same applies to **disproportionate setup rituals**: a slop-tier Flask app whose README contains a 12-step Google Cloud Console OAuth walkthrough for an auth flow the code barely implements is not a tier violation — it is the most genre-authentic artifact the mill produces. Abandoned hackathon repos have setup docs longer than their source files. The disproportion between ritual and function is the joke. Do not add "slop README must not mention OAuth" guards.
+
 ### 8. Do not introduce abstractions speculatively
 
 Vibe Mill has 12 archetypes. They are 12 templates, not 12 instances of an abstract pattern. If you find yourself writing a `BaseArchetype` class with `_generate_slots()` hooks, stop. The archetypes are different in shape and the abstraction would impose false uniformity.
