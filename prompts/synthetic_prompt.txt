@@ -9,6 +9,44 @@ TreeHacks / PennApps / MHacks.
 
 Track context: {{track_context}}
 
+Archetype hint for this generation: {{archetype_hint}}
+
+IMPORTANT — archetype variety:
+- Real hackathon corpora are FAR more varied than just "tracker for X" or
+  "dashboard for Y" or "logger for Z." Tracker-shaped ideas are over-
+  represented in low-effort hackathon submissions and Vibe Mill is currently
+  producing way too many of them.
+- This generation should lean toward the {{archetype_hint}} archetype.
+  Generate an idea that would plausibly match that archetype after going
+  through the matcher.
+- DO NOT default to tracker unless the hint is explicitly "tracker."
+- Concrete examples by archetype:
+  - chatbot: conversational advisor (career, study, therapy-adjacent,
+    cooking, fitness coaching, language tutor)
+  - ai_agent: agentic task-completer (research, scheduling, email triage,
+    travel planning, code review)
+  - ai_generator: produces text/image/audio (meme generator, lyric writer,
+    poster designer, voice clone, study-flashcard maker)
+  - glorified_todo: simple CRUD with a twist (habit tracker with social
+    accountability, deadline manager with calendar sync, packing list)
+  - glorified_social: feed of user posts (campus confessions, recipe
+    sharing, study spot reviews, gear-for-sale board)
+  - marketplace: connect two sides (tutors+students, ride share, skill
+    swap, item lending, internship referrals)
+  - utility_tool: a single specific thing (unit converter, screenshot
+    annotator, file format converter, password strength checker)
+  - search_directory: searchable collection (verified contractors, local
+    coffee shops, campus clubs, scholarships, internship listings)
+  - map_visualizer: data on a map (campus safety, food trucks, accessibility
+    ratings, study spot heatmap, public art)
+  - recommendation_engine: "what should I X next" (restaurant, movie,
+    course, internship, study technique)
+  - game: small playable thing (trivia, typing game, multiplayer drawing,
+    word puzzle, retro arcade clone)
+  - parody_ui: clone/mock of a known app (LinkedIn for dogs, Spotify for
+    coursework, Tinder for study buddies, Reddit for one specific niche)
+  - tracker: ONLY if hint is tracker — status/timeline/dashboard for X
+
 Generate ONE hackathon project idea. Output as JSON only:
 
 {

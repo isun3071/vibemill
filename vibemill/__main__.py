@@ -84,7 +84,7 @@ MAX_ATTEMPTS_PER_TICK = MAX_APPS_PER_TICK * 2
 # Bundle G: 40% news pipeline, 60% synthetic prompt pipeline.
 # Per app slot, an independent roll decides the source. If news is rolled
 # but the news queue is empty, falls back to synthetic.
-NEWS_SOURCE_RATIO = 0.40
+NEWS_SOURCE_RATIO = 0.25
 
 NEXT_BUILD_TIMEOUT_S = 240
 

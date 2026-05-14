@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 import secrets
 from datetime import datetime, timezone
@@ -45,6 +46,38 @@ _PROMPT_FILE = "synthetic_prompt.txt"
 # Modest token budget — output is JSON with a headline + 2-4 sentence
 # summary; should fit in a few hundred tokens.
 _MAX_TOKENS = 600
+
+# Calibrated synthetic-prompt archetype distribution. Without a hint, the LLM
+# defaults to "tracker for X" because it is the lowest-creativity hackathon
+# shape. Real hackathon corpora are much more varied. These weights bias the
+# synthetic pipeline toward the actual distribution real college teams pitch.
+# Pre-fix the synthetic pipeline produced ~60% trackers; post-fix it should
+# match ~12% tracker with the rest spread across chatbot / AI-flavored /
+# utility / glorified_* / etc.
+_ARCHETYPE_HINT_WEIGHTS: dict[str, float] = {
+    "chatbot": 0.15,
+    "ai_generator": 0.12,
+    "tracker": 0.12,
+    "ai_agent": 0.10,
+    "glorified_todo": 0.10,
+    "utility_tool": 0.08,
+    "glorified_social": 0.07,
+    "marketplace": 0.06,
+    "recommendation_engine": 0.05,
+    "map_visualizer": 0.05,
+    "search_directory": 0.05,
+    "game": 0.03,
+    "parody_ui": 0.02,
+}
+
+
+def _pick_archetype_hint() -> str:
+    """Weighted random archetype hint for the synthetic prompt. The matcher
+    still runs downstream and may route the prompt elsewhere; this just biases
+    the LLM\'s ideation away from the tracker default."""
+    slugs = list(_ARCHETYPE_HINT_WEIGHTS.keys())
+    ws = list(_ARCHETYPE_HINT_WEIGHTS.values())
+    return random.choices(slugs, weights=ws, k=1)[0]
 
 
 class SyntheticPromptError(RuntimeError):
@@ -99,10 +132,15 @@ def generate(track: TrackChoice) -> NewsItem:
 
     Raises SyntheticPromptError on two consecutive parse failures.
     """
-    user_prompt = _load_prompt().replace("{{track_context}}", _track_context(track))
+    archetype_hint = _pick_archetype_hint()
+    user_prompt = (
+        _load_prompt()
+        .replace("{{track_context}}", _track_context(track))
+        .replace("{{archetype_hint}}", archetype_hint)
+    )
     log.info(
-        "synthetic prompt: track=%s/%s chars=%d",
-        track.group, track.slug or "-", len(user_prompt),
+        "synthetic prompt: track=%s/%s archetype_hint=%s chars=%d",
+        track.group, track.slug or "-", archetype_hint, len(user_prompt),
     )
 
     for attempt in (1, 2):
