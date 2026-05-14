@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=ian
-Group=ian
-WorkingDirectory=/home/ian/vibemill
-EnvironmentFile=/home/ian/vibemill/.env
-ExecStart=/home/ian/.local/bin/uv run python -m vibemill
+User=isun3071
+Group=isun3071
+WorkingDirectory=/home/isun3071/vibemill
+EnvironmentFile=/home/isun3071/vibemill/.env
+ExecStart=/home/isun3071/.local/bin/uv run python -m vibemill
 StandardOutput=journal
 StandardError=journal
 TimeoutStartSec=600
@@ -19,7 +19,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/ian/vibemill
+ReadWritePaths=/home/isun3071/vibemill
 
 [Install]
 WantedBy=multi-user.target
