@@ -74,12 +74,12 @@ log = logging.getLogger(__name__)
 # instead of 24. To keep the 5-10 apps/day target, the per-tick budget rises
 # from ~0.4 to ~1.7 apps. Cap at 5 to give one tick room to clear a backlog
 # while still bounding worst-case cost spike.
-MAX_APPS_PER_TICK = 5
+MAX_APPS_PER_TICK = 2
 # Bundle G: with rejections common (~70% from Bundle F empirical data),
 # allow more attempts per tick to reach MAX_APPS_PER_TICK ships. Caps
 # runaway-rejection cost — at ~$0.003 per rejected attempt, MAX_ATTEMPTS
 # = 20 caps wasted spend at ~$0.06/tick.
-MAX_ATTEMPTS_PER_TICK = MAX_APPS_PER_TICK * 4
+MAX_ATTEMPTS_PER_TICK = MAX_APPS_PER_TICK * 2
 
 # Bundle G: 40% news pipeline, 60% synthetic prompt pipeline.
 # Per app slot, an independent roll decides the source. If news is rolled

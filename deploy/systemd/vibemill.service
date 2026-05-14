@@ -12,7 +12,7 @@ EnvironmentFile=/home/isun3071/vibemill/.env
 ExecStart=/home/isun3071/.local/bin/uv run python -m vibemill
 StandardOutput=journal
 StandardError=journal
-TimeoutStartSec=600
+TimeoutStartSec=3600
 
 # Sandboxing
 NoNewPrivileges=true
