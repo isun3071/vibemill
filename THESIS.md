@@ -296,7 +296,7 @@ The pillars are not redundant. None of them collapses into another. Together the
 - Vibe Mill does not claim that vibe coding is bad. Vibe coding is a practice. Vibe Mill demonstrates a property of credentialing pipelines that reward artifacts of vibe-coded provenance.
 - Vibe Mill does not claim that hackathons should be abolished. Hackathons are valuable as social and educational events. The argument is about what credentialing weight should be assigned to artifacts produced under hackathon conditions.
 - Vibe Mill does not claim that AI assisted coding has no place in software work. The METR finding is about a productivity gap, not a competence gap; the literature on AI assisted code is mixed and ongoing.
-- Vibe Mill does not claim originality of every component. The lineage from Magie's Landlord's Game through SCIgen, the Sokal hoax, and earlier operational satires is acknowledged. What is original is the specific application to vibe-coded credentialing infrastructure in 2026.
+- Vibe Mill does not claim originality of every component. The satirical lineage runs from [Lizzie Magie's Landlord's Game](https://en.wikipedia.org/wiki/The_Landlord%27s_Game) (1903) through [SCIgen](https://pdos.csail.mit.edu/archive/scigen/) (2005) and the [Sokal affair](https://en.wikipedia.org/wiki/Sokal_affair) (1996), and that lineage is acknowledged. The agentic AI lineage is also acknowledged. [Devin](https://devin.ai/) (Cognition Labs, March 2024) was the first widely named autonomous AI software engineer. [MetaGPT](https://github.com/FoundationAgents/MetaGPT) and [ChatDev](https://arxiv.org/html/2307.07924v5) (2023) are multi agent software development frameworks that simulate an AI software company. [AutoAgent](https://github.com/hkuds/autoagent) (HKUDS, 2025) is a fully automated agent platform. The [dark factory concept](https://www.mindstudio.ai/blog/what-is-dark-factory-autonomous-ai-codebase), articulated in industry writing in 2026, names the broader pattern of a codebase whose software development lifecycle runs end to end without human involvement at any step. Vibe Mill is not the first to imagine, propose, or build an autonomous app generator. What Vibe Mill is, is the first publicly running, satirically framed, operationally disclosed instance of the pattern applied to portfolio grade hackathon output, with the cemetery, the disclaimer, the cost ledger, and the anti patterns document as constitutive components. The components have prior art. The integration in this exact frame, against this specific credentialing pipeline target, is the contribution.
 
 The bound is part of the rigor. Each pillar is the narrowest sufficient claim to make its argument. Narrow claims are harder to refute than broad ones, and Vibe Mill's claims are designed to survive their refutations.
 
@@ -388,6 +388,14 @@ Citations referenced inline in this thesis, gathered here for verification.
 - [The Landlord's Game, Public Domain Review collection](https://publicdomainreview.org/collection/the-landlords-game)
 - [SCIgen, An Automatic CS Paper Generator (MIT CSAIL)](https://pdos.csail.mit.edu/archive/scigen/) and [How three MIT students fooled the world of scientific journals (MIT News)](https://news.mit.edu/2015/how-three-mit-students-fooled-scientific-journals-0414)
 - [Sokal affair (Wikipedia)](https://en.wikipedia.org/wiki/Sokal_affair)
+
+**Agentic AI and autonomous coding prior art**
+- [Devin AI (Cognition Labs) on Wikipedia](https://en.wikipedia.org/wiki/Devin_AI) and the [Devin product site](https://devin.ai/)
+- [MetaGPT GitHub repository](https://github.com/FoundationAgents/MetaGPT) and the [MetaGPT arxiv paper](https://arxiv.org/pdf/2308.00352)
+- [ChatDev arxiv paper](https://arxiv.org/html/2307.07924v5) and the [IBM explainer on ChatDev](https://www.ibm.com/think/topics/chatdev)
+- [AutoAgent (HKUDS) GitHub repository](https://github.com/hkuds/autoagent)
+- [The dark factory concept (MindStudio)](https://www.mindstudio.ai/blog/what-is-dark-factory-autonomous-ai-codebase) and [Dark factory AI agent (MindStudio)](https://www.mindstudio.ai/blog/what-is-a-dark-factory-ai-agent)
+- [Engineering autonomous AI pipelines, cron scheduled agents](https://earezki.com/ai-news/2026-03-12-how-to-schedule-ai-agent-tasks-with-cron-the-missing-guide/)
 
 URLs verified at the time this section was written. If a link rots, the underlying source is generally recoverable via the Internet Archive or by searching the article title.
 
