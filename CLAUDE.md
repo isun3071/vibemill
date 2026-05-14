@@ -1,7 +1,7 @@
 # Vibe Mill
 
 > *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."*
-> — Andrej Karpathy, October 2025
+> — Andrej Karpathy, December 2025
 
 Vibe Mill is a satirical app machine. It produces vibe-coded web applications from news headlines and synthetic hackathon prompts on a slow cadence (5–10 per day, in bursts every 4 hours). The mill does not promise quality. The mill does not promise relevance. The mill ships.
 

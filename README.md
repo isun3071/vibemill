@@ -4,7 +4,11 @@ Vibe Mill is an app machine. It grinds vibes into apps.
 
 The mill produces vibe-coded web applications from news headlines and one-line user prompts on a slow cadence (5–10 per day). The mill does not promise quality. The mill does not promise relevance. The mill ships.
 
-This repository contains the orchestrator, archetype templates, and (eventually) the public site. For a guided tour of the project's design, start with `CLAUDE.md`.
+This repository contains the orchestrator, archetype templates, and the public site at [vibemill.dev](https://vibemill.dev).
+
+- For the **backstory and intellectual frame** — why this project exists, the four pillars, the satirical method, the precedents it sets — read [`THESIS.md`](./THESIS.md).
+- For the **operational rules of what NOT to improve** — load-bearing anti-patterns that look like bugs but are not — read [`ANTI_PATTERNS.md`](./ANTI_PATTERNS.md).
+- For a **guided tour of the project's design** — architecture, archetypes, voice separation, workflow rules — start with [`CLAUDE.md`](./CLAUDE.md).
 
 ## V0 status
 
