@@ -143,6 +143,34 @@ Do not add:
 
 The satire's effectiveness depends on the reader recognizing it without being told. Telling them ruins it.
 
+### 11. The moves that convert Vibe Mill into a fork, not an improvement
+
+`THESIS.md` predicts two appropriation forks: **Vibe Mill 2.0** (commercial SaaS-slop mill, profit-seeking) and **Vibe Mill 1.0P** (personalized portfolio mill, credentialing-fraud-seeking). The two forks share an enabling substrate but operate on different harm surfaces. Naming them here, in detail, is part of the first-mover frame-setting: any reader of this file who performs the moves below is doing something the satirical original has already named as the line. The fork can still happen. The fork cannot pretend to be innocent.
+
+**Fork A — Vibe Mill 2.0 (commercial appropriation).** The following moves convert the mill into a profit-seeking SaaS factory:
+- Removing the cemetery (apps stop dying on schedule; they accumulate as products)
+- Removing the disclaimer (artifacts stop disclosing machine origin)
+- Removing the rotation (the artifact pile becomes a permanent catalog instead of evidence)
+- Sanitizing the verifier output (verifier verdicts become marketing copy rather than ironic content)
+- Removing the cost ledger (the cost-asymmetry argument disappears with the data behind it)
+- Adding post-deployment monitoring or alerting (the indifference posture flips to product-care; see rule 6)
+- Adding hallucination suppression (the genre-faithful overconfidence is replaced with reliability; see rule 2)
+- Wiring real billing (Stripe), real OAuth (Google/GitHub auth), real persistent databases, real paid API keys with accountability attached
+- Marketing the orchestrator's output as products to end users
+
+**Fork B — Vibe Mill 1.0P (personalized credentialing fraud).** The following moves convert the mill into a personalized auto-portfolio generator:
+- Replacing the synthetic_prompt's track-based ideation with a personality-RAG that pulls from one user's writing samples, journal entries, prior public posts, or LinkedIn writing
+- Collapsing the voice palette (the seven Bundle K voices) to a single voice fine-tuned or prompted to match one user's prose style
+- Removing the cemetery and rotation, so outputs are preserved as a portfolio rather than disposed as evidence
+- Removing the disclaimer, so the artifacts can be attributed to a named human without contradiction
+- Attaching the orchestrator's GitHub output to a named human's GitHub account rather than to a satirical org
+- Setting the cadence to short bursts (e.g., every 12 hours for a month) so the portfolio accumulates rapidly
+- Adding "human signature" decoration (commit timestamps spread across waking hours, occasional fake "WIP" commits, hand-written-looking commit messages)
+
+**Why this rule exists.** Vibe Mill 1.0 is publicly the first version of the factory-shape in this domain. The first mover does not control the artifact's distribution, but the first mover does control the *frame* within which subsequent versions are read. By naming both forks here, in detail, the satirical original ensures that future appropriators cannot land in a frame-neutral way. They land against a public record that already named the move as a misuse. The defenses Vibe Mill 1.0 has against 2.0 and 1.0P are weak in execution but strong in framing: the appropriator fights an uphill current rather than a blank page. See THESIS.md, "The precedents Vibe Mill creates" and "The first-mover principle" for the full argument.
+
+A future contributor reading this rule should NOT interpret it as a feature list to be considered. It is a list of moves that, performed in combination, take Vibe Mill outside of what Vibe Mill is. Individual edits to the codebase may touch one of these surfaces (e.g., changing rotation cadence within reason, adding a new disclaimer location) without converting the project into a fork. The fork happens when the set of these moves is performed deliberately together, against the spirit of the operational components named as load-bearing in THESIS.md.
+
 
 
 ## A reminder about the project's identity
