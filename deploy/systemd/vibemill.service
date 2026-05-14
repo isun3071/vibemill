@@ -19,7 +19,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/isun3071/vibemill /home/isun3071/.cache/uv
+ReadWritePaths=/home/isun3071/vibemill /home/isun3071/.cache/uv /home/isun3071/.npm
 
 [Install]
 WantedBy=multi-user.target
