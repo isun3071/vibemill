@@ -172,18 +172,18 @@ What Vibe Mill conceives:
 What Vibe Mill does not conceive:
 - The 12 archetypes themselves (those were authored)
 - The orchestrator design (authored)
-- Operation Clarissa (out of scope and out of capability)
+- The author's other intellectual work in other domains (out of scope and out of capability)
 - The thesis you are reading (this is human work)
 
 Notice the bound. Vibe Mill is not a general ideation machine. It conceives within a narrow scope. **That is the strongest possible form of the claim.** The most a defender of atomicity can do is push the boundary of "real ideation" outside Vibe Mill's scope. But every push is a concession. The boundary keeps moving inward as automation expands. Each new archetype Vibe Mill could plausibly add represents a domain in which "ideation" turns out to have been a composite activity all along.
 
 Karpathy's "the bits contributed by the programmer are increasingly sparse and between" is the empirical version of Pillar 3. He is reporting from inside the practice that ideation, as previously bundled, is decomposing. Some sub-activities are mechanizable; some are not yet. The bundle was always composite.
 
-### The Operation Clarissa carve-out is structural, not incidental
+### The boundedness is structural, not incidental
 
-Vibe Mill is bounded. It does not produce frameworks like the Deception Disruption Framework, Zero Trust for Humans, the Four I's, or the Three Schizophrenias. The author's other work conceives of these; Vibe Mill cannot. This boundary is part of what Pillar 3 demonstrates. Atomicity falls; *generality of ideation does not follow*.
+Vibe Mill is bounded. It does not produce general frameworks, theories, or constructive proposals. The author's other intellectual work conceives of these; Vibe Mill cannot. This boundary is part of what Pillar 3 demonstrates. Atomicity falls; *generality of ideation does not follow*.
 
-Pillar 3 destroys atomicity but does not establish that machines conceive on the scale humans do. It establishes that *some* conception is mechanizable, and the work of figuring out *which* is now an empirical question rather than a metaphysical one. The constructive frameworks of Operation Clarissa ask the post-atomicity questions: given that some human-layer work is decomposable and mechanizable, how should we think about training, hiring, professional identity, and institutional design? Vibe Mill clears the ground. Operation Clarissa builds on it.
+Pillar 3 destroys atomicity but does not establish that machines conceive on the scale humans do. It establishes that *some* conception is mechanizable, and the work of figuring out *which* is now an empirical question rather than a metaphysical one. The post-atomicity questions — given that some human-layer work is decomposable and mechanizable, how should we think about training, hiring, professional identity, and institutional design? — are necessary follow-ups, and they fall outside Vibe Mill's scope. Vibe Mill clears the ground. Constructive work on those questions has to build on the cleared ground; it is not the same work.
 
 ## Corollary to Pillar 3: The Popular-Expression Decomposition
 
@@ -240,7 +240,7 @@ The discipline to stay at one instance is part of the demonstration. The threat 
 
 Pillars 1, 2, and 3 indict structures and institutions. They are intellectually devastating but cool. Pillar 4 is the only pillar with a protagonist: the kid in the dorm room. The satire stands with the kid against the system that is exploiting them. The emotional content is the satirical content. *Vibe Mill exists, in part, because nobody else is telling the kid the truth about what the artifact they just bled for is actually worth in the credentialing economy.*
 
-This is also where Vibe Mill connects to the rest of the author's work. Operation Clarissa's engagement-substrate problem identifies the same shape of cost asymmetry in a different domain: even the engaged 20% of workers experiences security as a tax on their actual work. Vibe Mill's Pillar 4 is the credentialing-pipeline version of the same observation. *The pipeline asks individuals to subsidize structural inadequacies with their bodies and their time*. Pillar 4 is the bridge.
+Pillar 4 is also where Vibe Mill generalizes. The pattern — institutions asking individuals to subsidize structural inadequacies with their bodies and their time — recurs across credentialing economies, gig labor, on-call work, security compliance, healthcare administration, and other domains where systems offload their own inefficiencies onto the people they serve. Vibe Mill names this pattern in the hackathon-credentialing case specifically. *The pipeline asks individuals to subsidize structural inadequacies with their bodies and their time.* That sentence is Pillar 4's load-bearing moral observation; the credentialing case is one instance of a broader shape that the thesis does not attempt to generalize but does want the reader to recognize.
 
 ## Calibration: indistinguishability from mean good hackathon team output
 
