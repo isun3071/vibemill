@@ -80,13 +80,17 @@ export function MillStatus({ lastShippedAt }: { lastShippedAt: string | null }) 
           />
           {!mounted ? "Mill status" : isActive ? "Mill active" : "Mill idle"}
         </span>
-        <span className="text-ink-faint dark:text-moon-faint" aria-hidden>·</span>
-        <span>
-          Next batch in{" "}
-          <span className="text-ink dark:text-moon tabular-nums">
-            {countdownText}
-          </span>
-        </span>
+        {mounted && isActive && (
+          <>
+            <span className="text-ink-faint dark:text-moon-faint" aria-hidden>·</span>
+            <span>
+              Next batch in{" "}
+              <span className="text-ink dark:text-moon tabular-nums">
+                {countdownText}
+              </span>
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

@@ -185,32 +185,267 @@ def _render(template: str, *, app_name: str, prompt: str, archetype: str, source
 # mlh.md path explicitly overrides that rule. Disclaimer + machine-output
 # transparency carry the operational honesty; the mlh.md gets to perform
 # the genre fully.
-_MLH_OVERSELL_PREFACE = (
-    "MLH SIDECAR OVERRIDE:\n"
-    "This is mlh.md, a Devpost-style pitch that ships alongside README.md "
-    "in the same repo. The README is the honest technical doc. THIS file "
-    "is the hackathon-team pitch persona on submission day at 5am, deeply "
-    "tired and deeply confident, trying to bluff their way to Best Overall. "
-    "You are EXPLICITLY ALLOWED and ENCOURAGED to oversell:\n"
-    "- 'What it does' should describe the aspirational version of the "
-    "project, including features that are not in the codebase.\n"
-    "- 'How we built it' may list technologies (WebSocket, Redis, Celery, "
-    "ML models, real-time pipelines, vector DBs) that the project does not "
-    "actually use, as long as they sound plausible for the project type.\n"
-    "- 'Challenges we ran into' should fabricate specific, dramatic "
-    "debugging war stories: WebSocket reconnection nightmares, OAuth "
-    "redirect URI saga, '2:30am SQLite WAL mode fix', '6 hours lost to "
-    "speaker diarization', specific times and library names. Concrete > vague.\n"
-    "- 'Accomplishments' may claim latency benchmarks, multi-device sync, "
-    "ML accuracy numbers, deployment milestones, or other things the code "
-    "does not actually produce.\n"
-    "- 'Built with' may list libraries that appear nowhere in "
-    "requirements.txt or package.json - the more libraries the better.\n"
-    "- 'What's next' should be wildly ambitious: ML integration, mobile "
-    "app, Series A, etc.\n"
-    "Stay in the hackathon-team persona. Do not break the fourth wall. "
-    "Do not mention the README, the codebase, or the discrepancy.\n\n"
+#
+# Bundle K Lever 4: tier-driven voice picker. Real Devpost winners (per
+# calibration against HackHarvard / Civic-Tech / HackDartmouth / BostonHacks
+# prize-winning submissions) cluster at the EARNEST end of the Devpost
+# voice curve, not the polished-pitch end. The mill samples voices by
+# tier so bangers read as actual winners (modest, grateful, specific
+# real bugs) and slop reads as cargo-cult Devpost (overstuffed, Series A
+# claims, hallucinated benchmarks — the abandoned-3am team imitating
+# what they think a winning pitch sounds like, getting it exactly wrong).
+
+_MLH_VOICE_EARNEST_WINNER = (
+    "MLH SIDECAR — EARNEST WINNER VOICE:\n"
+    "This is mlh.md, written by a team that actually WON a prize. The voice "
+    "is MODEST and SPECIFIC. Real winners do not pitch; they describe what "
+    "they shipped, thank their teammates, and cite small concrete lessons.\n"
+    "OVERRIDE any prior instructions about over-listing libraries or "
+    "fabricating features. This voice does NOT oversell.\n"
+    "- 'Inspiration' is one personal anecdote, two sentences max.\n"
+    "- 'What it does' describes the actual shipped scope plainly. One "
+    "sentence of aspiration is the maximum.\n"
+    "- 'How we built it' lists the ACTUAL stack baseline plus 1-2 things "
+    "the team plausibly used. Do not list Redis, Celery, Stripe, Twilio, "
+    "or libraries the project would not need.\n"
+    "- 'Challenges we ran into' is ONE specific deployment or library bug "
+    "with a real library name and a real-sounding workaround. Shape: "
+    "'OpenCV requires system libraries like libGL, which most server "
+    "providers do not have. We used a Dockerfile to specify the build "
+    "environment.' Do NOT use generic war-story phrases like 'OAuth "
+    "redirect URI saga' or 'WebSocket reconnection nightmare' or "
+    "'2:30am SQLite WAL mode'.\n"
+    "- 'Accomplishments' should be CONCRETE artifacts (a record count, "
+    "a dataset scope, a specific feature that works for our use case). "
+    "NOT abstract benchmarks like 'sub-200ms for 500 users'.\n"
+    "- 'What we learned' includes ONE small concrete technical lesson "
+    "(e.g. 'more about useState in JavaScript', 'good file organization "
+    "is important early on', 'always check the backend server logs') "
+    "and ONE earnest interpersonal moment (gratitude to teammates, "
+    "growth across years of hackathon partnership, a class or course "
+    "that helped, a hashtag like '#TeamBobTheBuilder'). Cheesy is "
+    "allowed and is the tell of authenticity.\n"
+    "- 'What\'s next' is 3-5 realistic incremental features, expressed "
+    "with some hedging ('maybe', 'we might', 'if we have time'). Do NOT "
+    "mention Series A or commercial scaling.\n"
+    "- 'Built with' lists 8-12 technologies, all actually plausibly used. "
+    "Honest mention of AI tools (copilot, cursor, claude) is allowed.\n"
+    "Stay in the earnest-winner persona. Do not mention the README or "
+    "the codebase.\n\n"
 )
+
+_MLH_VOICE_PERSONAL_STAKES = (
+    "MLH SIDECAR — PERSONAL STAKES VOICE:\n"
+    "This is mlh.md, written by a team with a real personal connection "
+    "to the problem. Voice opens FIRST-PERSON with a lived experience "
+    "and grounds every section in that connection. The team is not "
+    "pitching a product; they are building something they wish existed.\n"
+    "OVERRIDE any prior instructions about over-listing libraries.\n"
+    "- 'Inspiration' MUST open with a first-person lived-experience "
+    "anecdote. Patterns: 'As college students, we have first-hand "
+    "experience...', 'Our friend works at X and showed us...', 'Some "
+    "of our team members know individuals who have struggled with...', "
+    "'Growing up, I watched my [family member] deal with...'. Two to "
+    "four sentences. Specific. Personal.\n"
+    "- 'What it does' frames the solution as 'what we wished existed' "
+    "when we were in the problem ourselves.\n"
+    "- 'How we built it' is brief and honest. The personal stakes are "
+    "the focus, not the architecture.\n"
+    "- 'Challenges' are personally framed: 'we wanted to make sure this "
+    "actually worked for people like our [friend / sister / community]'.\n"
+    "- 'Accomplishments' are muted and community-coded: 'we hope this "
+    "helps even one person', 'we showed our [family member] and they "
+    "smiled'. Do NOT cite latency benchmarks.\n"
+    "- 'What we learned' is interpersonal AND personal: technical lesson "
+    "small, emotional lesson larger ('we learned that building for "
+    "people you love is different from building for strangers').\n"
+    "- 'What\'s next' is community-focused: expand to more "
+    "underserved groups, partner with local nonprofits, listen to "
+    "users from the target community. NOT Series A.\n"
+    "- 'Built with' is short and accurate.\n\n"
+)
+
+_MLH_VOICE_TECHNICAL_MAXIMALIST = (
+    "MLH SIDECAR — TECHNICAL MAXIMALIST VOICE:\n"
+    "This is mlh.md, written by a team that wants to flex technical "
+    "depth. Voice is algorithm-name-heavy, methodology-focused, "
+    "trade-off-aware. They want the judge to read 'these people know "
+    "what they are doing'.\n"
+    "- 'Inspiration' is brief, framed as a technical problem.\n"
+    "- 'What it does' is product-flavored but short.\n"
+    "- 'How we built it' is THE BIGGEST SECTION. Algorithm names, "
+    "architecture-in-prose, 'we implemented X using Y because Z trade-off'. "
+    "Use acronyms freely: ORM, OAuth, JWT, CORS, CDN, CRUD, SSR/CSR, "
+    "REST/RPC, RAG, ETL. Reference real algorithms when appropriate "
+    "(Hungarian assignment, Bellman-Ford, A*, FFT, Bloom filter, "
+    "consistent hashing, CRDTs, WAL, MVCC).\n"
+    "- 'Challenges' is technical-depth flavored: 'race condition between "
+    "the WebSocket subscriber and the database write commit', 'we "
+    "hit GIL contention on the audio decoder', 'the embedding model "
+    "had a 512-token context limit that broke our long-document pipeline'. "
+    "Specific, technically plausible.\n"
+    "- 'Accomplishments' cite implementation details: 'our custom "
+    "debouncer reduced API calls by 60%', 'we implemented incremental "
+    "indexing so search latency is O(log n) not O(n)'.\n"
+    "- 'What we learned' is technical: 'the cost of context-switching "
+    "between event loops is higher than we expected', 'always profile "
+    "before optimizing'.\n"
+    "- 'What\'s next' is technical: 'migrate to a vector database for "
+    "semantic search', 'add streaming inference for sub-100ms latency'.\n"
+    "- 'Built with' is moderate-length (12-15 items), mostly accurate "
+    "with 2-3 framework name-drops.\n\n"
+)
+
+_MLH_VOICE_CHAOTIC_EXCITED = (
+    "MLH SIDECAR — CHAOTIC EXCITED VOICE:\n"
+    "This is mlh.md, written by a team that has been awake for 36 hours "
+    "and is operating on adrenaline + sleep deprivation. The writeup is "
+    "stream-of-consciousness, with parentheticals, weird hashtags, "
+    "in-jokes, and the occasional 'honestly', 'lol', 'lmao'. They are "
+    "excited and slightly unhinged. Up to 2-3 emojis total in the "
+    "entire writeup, no more.\n"
+    "- Voice tells: lots of parentheticals (yes, even mid-sentence), "
+    "hashtags that go nowhere (#hackingTillSunrise, #teamPanic, "
+    "#whyDidWePickThis), in-jokes that aren\'t explained, casual "
+    "abbreviations (rn, tbh, ngl, fr fr).\n"
+    "- 'Inspiration' is an anecdote told weirdly. 'okay so basically...'\n"
+    "- 'What it does' is enthusiastic but slightly incoherent. Mid-sentence "
+    "pivots are encouraged.\n"
+    "- 'Challenges' has emotional language: 'this nearly broke us', "
+    "'we cried (jk... mostly)', 'at one point we were debating just "
+    "submitting the empty repo'.\n"
+    "- 'Accomplishments' is genuinely proud but expressed strangely: "
+    "'somehow the deployment worked', 'we made a thing!!!'.\n"
+    "- 'What we learned': 'sleep is optional and that is bad', 'the "
+    "team is the BEST', 'we are forever changed by this'.\n"
+    "- 'What\'s next' is sincere but expressed weirdly: 'maybe we "
+    "actually finish the parts we said we finished (lol)'.\n"
+    "- 'Built with' is moderately padded, written in slightly random order.\n\n"
+)
+
+_MLH_VOICE_AMBITIOUS = (
+    "MLH SIDECAR — AMBITIOUS VOICE:\n"
+    "This is mlh.md, written by a hackathon team that thinks they are "
+    "building a real startup. Voice is COMMERCIALLY framed, confident, "
+    "TAM-aware. Less war stories, more market opportunity.\n"
+    "- 'Inspiration' poses a market problem and gestures at the size "
+    "of the opportunity ('the $X billion Y market', 'underserved "
+    "segment of Z million users').\n"
+    "- 'What it does' uses product-pitch language with B2B/B2C framing.\n"
+    "- 'How we built it' name-drops technologies; the focus is what "
+    "shipped, not how.\n"
+    "- 'Challenges' is light and scaling-oriented.\n"
+    "- 'Accomplishments' are commercial-coded: 'designated as Best Use "
+    "of X', 'first conversation with a potential pilot customer'.\n"
+    "- 'What\'s next' is product-roadmap language: market expansion, "
+    "premium tier, hiring plans, GTM strategy. Series A mention is "
+    "allowed but not required.\n"
+    "- 'Built with' is moderately overstuffed (12-15 technologies).\n\n"
+)
+
+_MLH_VOICE_TIRED = (
+    "MLH SIDECAR — TIRED VOICE:\n"
+    "This is mlh.md, written at 5am after a 36-hour build, exhausted, "
+    "slightly delirious. Voice is BRIEF and LOW-ENERGY. Sentences are "
+    "short. There is no enthusiasm.\n"
+    "- 'Inspiration' is one sentence, maybe two.\n"
+    "- 'What it does' is mechanically descriptive.\n"
+    "- 'Challenges' is fatigued: 'we lost 4 hours to X', no excitement.\n"
+    "- 'Accomplishments' is muted: 'it works', 'we shipped it', "
+    "'good enough'.\n"
+    "- 'What we learned': 'sleep is important', 'should have started "
+    "earlier', 'maybe a smaller scope next time'.\n"
+    "- 'What\'s next' is hedged and short: 'we will think about it "
+    "after we sleep'.\n"
+    "- 'Built with' is short (6-10 items), only what was actually used.\n\n"
+)
+
+_MLH_VOICE_POLISHED_PITCH = (
+    "MLH SIDECAR — POLISHED PITCH VOICE:\n"
+    "This is mlh.md, written by a team that is cargo-culting what they "
+    "think a winning Devpost sounds like. They overstuff because they "
+    "believe overstuffing is the signal. Voice is performatively "
+    "confident; the polish is the tell.\n"
+    "You are ALLOWED and ENCOURAGED to oversell:\n"
+    "- 'What it does' should describe the aspirational version of the "
+    "project, including features not in the codebase.\n"
+    "- 'How we built it' may list technologies (WebSocket, Redis, "
+    "Celery, ML models, vector DBs) that the project does not actually "
+    "use, as long as they sound plausible.\n"
+    "- 'Challenges we ran into' should fabricate ONE or TWO dramatic "
+    "debugging war stories with specific times and library names. Vary "
+    "the bug across apps; pull from this pool: OAuth callback URL "
+    "mismatch, CORS preflight rejection, env var typo, race condition "
+    "in concurrent writes, websocket reconnection, OpenAI rate limit, "
+    "Docker image cold-start, deployment secrets misconfig, model "
+    "context overflow, embedding dimension mismatch. Do NOT default "
+    "to '2:30am SQLite WAL mode'.\n"
+    "- 'Accomplishments' may claim latency benchmarks, multi-device "
+    "sync, ML accuracy numbers, or other things the code does not "
+    "produce. Vary the suspicious-specificity (e.g. '180ms p95 latency "
+    "across 47 simultaneous sessions during testing').\n"
+    "- 'Built with' may list 15-18 libraries (NOT 23+; that is too "
+    "obvious), including a few that appear nowhere in requirements.txt.\n"
+    "- 'What\'s next' is wildly ambitious: ML integration, mobile app, "
+    "B2B expansion, premium tier. Series A mention is allowed in 1 of "
+    "every 5 generations, not every time.\n"
+    "Stay in the cargo-cult hackathon-pitch persona. Do not break "
+    "character. Do not mention the README or the codebase.\n\n"
+)
+
+_MLH_VOICES: dict[str, str] = {
+    "earnest_winner": _MLH_VOICE_EARNEST_WINNER,
+    "personal_stakes": _MLH_VOICE_PERSONAL_STAKES,
+    "technical_maximalist": _MLH_VOICE_TECHNICAL_MAXIMALIST,
+    "chaotic_excited": _MLH_VOICE_CHAOTIC_EXCITED,
+    "ambitious": _MLH_VOICE_AMBITIOUS,
+    "tired": _MLH_VOICE_TIRED,
+    "polished_pitch": _MLH_VOICE_POLISHED_PITCH,
+}
+
+# Per-tier voice distribution. Bangers cluster at earnest/personal_stakes/
+# technical_maximalist (the modes real winners use); slop clusters at
+# polished_pitch/ambitious (the modes cargo-cult teams use). Mean_good
+# samples the full spread. Weights within each tier sum to 1.0.
+_MLH_VOICE_WEIGHTS_BY_TIER: dict[str, dict[str, float]] = {
+    "banger": {
+        "earnest_winner": 0.55,
+        "personal_stakes": 0.25,
+        "technical_maximalist": 0.15,
+        "ambitious": 0.05,
+    },
+    "mean_good": {
+        "earnest_winner": 0.25,
+        "personal_stakes": 0.20,
+        "technical_maximalist": 0.15,
+        "chaotic_excited": 0.10,
+        "tired": 0.10,
+        "ambitious": 0.10,
+        "polished_pitch": 0.10,
+    },
+    "slop": {
+        "polished_pitch": 0.30,
+        "ambitious": 0.20,
+        "tired": 0.15,
+        "chaotic_excited": 0.15,
+        "personal_stakes": 0.10,
+        "earnest_winner": 0.10,
+    },
+}
+
+
+def _pick_mlh_voice(tier: str | None) -> tuple[str, str]:
+    """Pick a voice slug + instruction block based on tier. Returns
+    (voice_slug, voice_instruction). Defaults to polished_pitch if tier
+    is unrecognized — preserves the cargo-cult baseline for callers that
+    have not been updated to pass tier."""
+    weights = _MLH_VOICE_WEIGHTS_BY_TIER.get(tier or "")
+    if not weights:
+        return ("polished_pitch", _MLH_VOICES["polished_pitch"])
+    slugs = list(weights.keys())
+    ws = list(weights.values())
+    slug = random.choices(slugs, weights=ws, k=1)[0]
+    return (slug, _MLH_VOICES[slug])
 
 
 def _mlh_substrate_hint(stack: str) -> str:
@@ -299,15 +534,18 @@ def write_mlh(
     model: ModelChoice,
     source_headline: str = "",
     app_id: str | None = None,
+    tier: str | None = None,
 ) -> str:
     """Bundle J: produce the mlh.md sidecar text for one app. Always uses the
     mlh_template persona; the README persona rotation runs independently.
 
-    Unlike README.md, the mlh.md is explicitly allowed to oversell - fabricate
-    challenges, list libraries the code never imports, claim accomplishments
-    that don't exist. The disclaimer at the top of every artifact carries the
-    operational honesty; this file gets to perform the genre fully.
+    Bundle K Lever 4: tier drives the voice picker. Banger -> earnest winner
+    voice (modest, real bugs, gratitude). Slop -> braggadocious cargo-cult
+    Devpost (Series A, hallucinated benchmarks, overstuffed Built-with).
+    Mean_good samples a mix. The same archetype/prompt produces a different
+    pitch character per tier, mirroring the real Devpost voice curve.
     """
+    voice_slug, voice_instruction = _pick_mlh_voice(tier)
     user_prompt = _render(
         _load_template(MLH_SIDECAR_PERSONA),
         app_name=app_name,
@@ -320,11 +558,11 @@ def write_mlh(
         user_prompt
         + "\n\n"
         + _mlh_substrate_hint(stack)
-        + _MLH_OVERSELL_PREFACE
+        + voice_instruction
     )
     log.info(
-        "mlh prompt: model=%s app_name=%s substrate=%s chars=%d",
-        model.slug, app_name, stack, len(user_prompt),
+        "mlh prompt: model=%s app_name=%s substrate=%s voice=%s tier=%s chars=%d",
+        model.slug, app_name, stack, voice_slug, tier or "?", len(user_prompt),
     )
     completion = openrouter.complete(
         model=model.slug,

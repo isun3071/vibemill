@@ -564,6 +564,7 @@ def _ship_one(
             source_headline=item.headline,
             model=readme_choice,
             app_id=app_id,
+            tier=tier,
         )
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
