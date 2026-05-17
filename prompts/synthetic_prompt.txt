@@ -11,6 +11,8 @@ Track context: {{track_context}}
 
 Archetype hint for this generation: {{archetype_hint}}
 
+{{tier_emphasis}}
+
 IMPORTANT — archetype variety:
 - Real hackathon corpora are FAR more varied than just "tracker for X" or
   "dashboard for Y" or "logger for Z." Tracker-shaped ideas are over-

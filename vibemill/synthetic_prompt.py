@@ -54,30 +54,106 @@ _MAX_TOKENS = 600
 # Pre-fix the synthetic pipeline produced ~60% trackers; post-fix it should
 # match ~12% tracker with the rest spread across chatbot / AI-flavored /
 # utility / glorified_* / etc.
-_ARCHETYPE_HINT_WEIGHTS: dict[str, float] = {
-    "chatbot": 0.15,
-    "ai_generator": 0.12,
-    "tracker": 0.12,
-    "ai_agent": 0.10,
-    "glorified_todo": 0.10,
-    "utility_tool": 0.08,
-    "glorified_social": 0.07,
-    "marketplace": 0.06,
-    "recommendation_engine": 0.05,
-    "map_visualizer": 0.05,
-    "search_directory": 0.05,
-    "game": 0.03,
-    "parody_ui": 0.02,
+# Bundle L: tier-keyed archetype hint distributions. Banger biases toward
+# the shapes that actually win Best Overall in 2025-2026 (agentic AI, civic
+# tech, collaborative real-time). Slop biases toward derivative shapes
+# (glorified_todo, parody_ui) that real abandoned 3am teams ship. Mean_good
+# keeps the previously calibrated mid distribution.
+_ARCHETYPE_HINT_WEIGHTS_BY_TIER: dict[str, dict[str, float]] = {
+    "banger": {
+        "ai_agent": 0.20,
+        "chatbot": 0.18,
+        "tracker": 0.12,
+        "ai_generator": 0.10,
+        "map_visualizer": 0.08,
+        "glorified_social": 0.08,
+        "search_directory": 0.07,
+        "utility_tool": 0.07,
+        "marketplace": 0.05,
+        "recommendation_engine": 0.03,
+        "glorified_todo": 0.01,
+        "game": 0.01,
+        "parody_ui": 0.00,
+    },
+    "mean_good": {
+        "chatbot": 0.15,
+        "ai_generator": 0.12,
+        "tracker": 0.12,
+        "ai_agent": 0.10,
+        "glorified_todo": 0.10,
+        "utility_tool": 0.08,
+        "glorified_social": 0.07,
+        "marketplace": 0.06,
+        "recommendation_engine": 0.05,
+        "map_visualizer": 0.05,
+        "search_directory": 0.05,
+        "game": 0.03,
+        "parody_ui": 0.02,
+    },
+    "slop": {
+        "glorified_todo": 0.20,
+        "parody_ui": 0.15,
+        "tracker": 0.12,
+        "glorified_social": 0.10,
+        "utility_tool": 0.10,
+        "chatbot": 0.08,
+        "recommendation_engine": 0.05,
+        "game": 0.05,
+        "marketplace": 0.04,
+        "search_directory": 0.04,
+        "ai_generator": 0.03,
+        "map_visualizer": 0.02,
+        "ai_agent": 0.02,
+    },
+}
+
+# Tier-emphasis blocks injected into the synthetic prompt. Banger gets
+# differentiation guidance and recent real winner exemplars. Slop gets
+# permission to be derivative. Mean_good targets subsidiary prize quality.
+_TIER_EMPHASIS: dict[str, str] = {
+    "banger": (
+        "TIER: BANGER. Target Best Overall quality. The idea must have a HOOK:\n"
+        "- A SPECIFIC underserved problem named in the inspiration, OR\n"
+        "- A SPECIFIC data source or interaction model named in the build, OR\n"
+        "- A SPECIFIC novel angle that differentiates from generic shapes.\n"
+        "Avoid generic framings like \"tracker for X\" or \"chatbot for Y\" without a hook.\n"
+        "The idea should have a concrete user interaction beyond CRUD.\n"
+        "Recent banger-class winner shapes, use as inspiration NOT as templates:\n"
+        "- HiveMind (TreeHacks 2025 grand prize): AI peer learning agent that detects students struggling silently in Zoom classrooms and forms real time peer learning nodes.\n"
+        "- SafeContractor (Civic Tech, Best Overall): scraped seventy thousand contractor license records from obscure public databases, with AI generated credential summaries to flag scammers.\n"
+        "- Spent (HackHarvard, Best Financial Hack): predicts spending from your Google Calendar events using Gemini, BEFORE the money leaves your wallet.\n"
+        "- TrueFace (HackDartmouth, Best Use of MongoDB): dual sided interview platform with real time deepfake detection on the candidate webcam stream.\n"
+        "- Receipt splitter MVP class: receipt OCR plus item level Hungarian assignment debt settlement, settle group debts in minimal transactions.\n"
+    ),
+    "mean_good": (
+        "TIER: MEAN_GOOD. Target subsidiary prize quality (Best UI / Best Tech / Best Use of X / Most Innovative / Best Niche).\n"
+        "- Polished in ONE dimension (UI, tech, integration, or niche fit), not all of them.\n"
+        "- Specific enough to demo cleanly. Broad enough to leave half the features as TODOs.\n"
+        "- Address a relatable college student or young professional problem.\n"
+    ),
+    "slop": (
+        "TIER: SLOP. Target abandoned at 3am quality.\n"
+        "- Generic framings are fine. Derivative is fine.\n"
+        "- Mock data is canonical.\n"
+        "- The idea can be unimpressive. Real exhausted teams ship unimpressive ideas to get any submission in.\n"
+    ),
 }
 
 
-def _pick_archetype_hint() -> str:
-    """Weighted random archetype hint for the synthetic prompt. The matcher
-    still runs downstream and may route the prompt elsewhere; this just biases
-    the LLM\'s ideation away from the tracker default."""
-    slugs = list(_ARCHETYPE_HINT_WEIGHTS.keys())
-    ws = list(_ARCHETYPE_HINT_WEIGHTS.values())
+def _pick_archetype_hint(tier: str | None = None) -> str:
+    """Weighted random archetype hint for the synthetic prompt. Tier biases
+    the distribution toward shapes that match the target tier's real world
+    win rate. The matcher still runs downstream and may route the prompt
+    elsewhere; this just biases the LLM ideation toward the right shape."""
+    weights = _ARCHETYPE_HINT_WEIGHTS_BY_TIER.get(tier or "mean_good") or _ARCHETYPE_HINT_WEIGHTS_BY_TIER["mean_good"]
+    slugs = list(weights.keys())
+    ws = list(weights.values())
     return random.choices(slugs, weights=ws, k=1)[0]
+
+
+def _tier_emphasis(tier: str | None) -> str:
+    """Tier-conditional guidance block injected into the synthetic prompt."""
+    return _TIER_EMPHASIS.get(tier or "mean_good", _TIER_EMPHASIS["mean_good"])
 
 
 class SyntheticPromptError(RuntimeError):
@@ -127,20 +203,27 @@ def _call(user_prompt: str) -> str:
     return completion.text or ""
 
 
-def generate(track: TrackChoice) -> NewsItem:
+def generate(track: TrackChoice, tier: str | None = None) -> NewsItem:
     """Generate one synthetic hackathon-idea NewsItem.
+
+    Bundle L: when tier is provided, the archetype hint distribution and the
+    tier emphasis block are conditioned on it. Banger gets differentiation
+    guidance and winner exemplars. Slop gets permission to be derivative.
+    Mean_good and unknown tiers fall back to the calibrated mid distribution.
 
     Raises SyntheticPromptError on two consecutive parse failures.
     """
-    archetype_hint = _pick_archetype_hint()
+    archetype_hint = _pick_archetype_hint(tier)
+    tier_emphasis = _tier_emphasis(tier)
     user_prompt = (
         _load_prompt()
         .replace("{{track_context}}", _track_context(track))
         .replace("{{archetype_hint}}", archetype_hint)
+        .replace("{{tier_emphasis}}", tier_emphasis)
     )
     log.info(
-        "synthetic prompt: track=%s/%s archetype_hint=%s chars=%d",
-        track.group, track.slug or "-", archetype_hint, len(user_prompt),
+        "synthetic prompt: track=%s/%s tier=%s archetype_hint=%s chars=%d",
+        track.group, track.slug or "-", tier or "?", archetype_hint, len(user_prompt),
     )
 
     for attempt in (1, 2):

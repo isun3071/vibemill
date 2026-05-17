@@ -460,10 +460,14 @@ def _ship_one(
     # web-search budget, build-retry cap, reasoning effort. Per
     # ANTI_PATTERNS rule 5 v5, this samples real-producer effort variance.
     if tier_override is not None:
+        # Bundle L: tier_override is used both by CLI ship-one (--tier flag)
+        # and by the tick loop pre-rolling for synthetic ideation. Either
+        # way, the tier dice were rolled upstream.
         tier = tier_override
-        log.info("tier dice skipped (override): forcing tier=%s", tier)
+        log.info("tier=%s (pre-rolled by caller)", tier)
     else:
         tier = tiers.pick_tier()
+        log.info("tier=%s (rolled in ship)", tier)
     tier_cfg = tiers.get_config(tier)
     committed_path = tier == tiers.TIER_BANGER  # backwards-compat with migration 004
 
@@ -909,23 +913,34 @@ def run_tick() -> TickResult:
     while shipped < MAX_APPS_PER_TICK and attempts < MAX_ATTEMPTS_PER_TICK:
         attempts += 1
 
-        # Per-slot 40/60 roll. If news rolled but queue is empty, fall
-        # through to synthetic.
+        # Per-slot news/synthetic roll. If news rolled but queue is empty,
+        # fall through to synthetic.
         use_news = (_random.random() < NEWS_SOURCE_RATIO) and bool(news_queue)
+
+        # Bundle L: pre-roll the tier so synthetic ideation can condition on
+        # it. News path keeps tier=None and lets _ship_one roll internally
+        # since the news headline already supplies the ideation seed.
+        pre_rolled_tier: str | None = None
+
         if use_news:
             item = news_queue.pop(0)
             synthetic_track: str | None = None
         else:
+            pre_rolled_tier = tiers.pick_tier()
             track = tracks.pick_track()
             try:
-                item = synthetic_prompt.generate(track)
+                item = synthetic_prompt.generate(track, tier=pre_rolled_tier)
             except synthetic_prompt.SyntheticPromptError as exc:
                 log.warning("tick: synthetic generation failed; skipping slot: %s", exc)
                 continue
             synthetic_track = f"{track.group}:{track.slug}" if track.slug else track.group
 
         try:
-            outcome = _ship_one(item, synthetic_track=synthetic_track)
+            outcome = _ship_one(
+                item,
+                synthetic_track=synthetic_track,
+                tier_override=pre_rolled_tier,
+            )
         except Exception as exc:
             log.exception("unexpected error processing %s: %s", item.url, exc)
             continue
