@@ -14,7 +14,7 @@ import logging
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -314,6 +314,21 @@ def list_live_apps_oldest_first() -> list[App]:
     """Return live, non-viral apps ordered by created_at ascending."""
     with session() as s:
         stmt = select(App).where(App.status == "live").order_by(App.created_at.asc())  # type: ignore[union-attr]
+        return list(s.exec(stmt))
+
+
+def list_live_apps_older_than(days: int) -> list[App]:
+    """Return live apps whose created_at is older than `days` days ago.
+    Used by run_rotation() for age-based retirement; pairs with the
+    cap-based pass that retires the oldest if still over LIVE_APP_CAP."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    with session() as s:
+        stmt = (
+            select(App)
+            .where(App.status == "live")  # type: ignore[union-attr]
+            .where(App.created_at < cutoff)  # type: ignore[arg-type]
+            .order_by(App.created_at.asc())  # type: ignore[union-attr]
+        )
         return list(s.exec(stmt))
 
 

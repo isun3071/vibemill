@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getLiveApps, getLiveAppsCount, getTodayCounts } from "@/lib/queries";
 import { AppCard } from "./app-card";
+import { TodayCounts } from "./today-counts";
 
 const PER_PAGE = 12; // 4 cols x 3 rows at lg breakpoint
 
@@ -77,10 +78,7 @@ export async function AppGrid({ page = 1 }: { page?: number }) {
         </nav>
       ) : null}
 
-      <p className="font-mono text-xs text-ink-faint dark:text-moon-faint mt-10 text-center">
-        Today: {counts.shipped} shipped &middot; {counts.guardRejected} guard-rejected &middot;{" "}
-        {counts.matcherRejected} matcher-rejected
-      </p>
+      <TodayCounts initial={counts} />
     </section>
   );
 }

@@ -20,13 +20,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from . import audit, db, snapshot
 from .clients import github, hf_spaces, vercel
 from .config import get_settings
 
 log = logging.getLogger(__name__)
+
+# Apps older than this are retired regardless of population cap. The
+# thesis glossary claims a twenty-one-day lifespan for every app; this
+# constant is the operational version of that claim. Pair with
+# LIVE_APP_CAP for the cap-based retirement pass.
+RETENTION_DAYS = 21
 
 
 @dataclass
@@ -107,24 +113,51 @@ def retire_app(app_id: str, *, reason: str = "manual") -> RetireOutcome:
 
 
 def run_rotation(*, push_snapshot: bool = True) -> list[RetireOutcome]:
-    """Daily-cron entry. Retires the oldest non-viral live apps until we
-    are back at LIVE_APP_CAP. Pushes a snapshot at the end unless caller
-    suppresses (used by the CLI to batch its own snapshot push).
+    """Daily-cron entry. Retires in two passes, whichever applies first:
+
+    1. AGE pass. Every live app older than RETENTION_DAYS is retired,
+       regardless of how many live apps there currently are. This pass
+       enforces the cemetery cadence the thesis glossary describes.
+    2. CAP pass. If after the age pass the live population still exceeds
+       LIVE_APP_CAP, the oldest remaining live apps get retired until we
+       are back at the cap.
+
+    Pushes a snapshot at the end unless the caller suppresses it (used
+    by the CLI when batching its own snapshot push).
     """
     cap = get_settings().LIVE_APP_CAP
+    outcomes: list[RetireOutcome] = []
+
+    # Age pass: anything older than RETENTION_DAYS goes.
+    age_candidates = db.list_live_apps_older_than(RETENTION_DAYS)
+    if age_candidates:
+        log.info(
+            "rotation: age pass retiring %d apps older than %d days",
+            len(age_candidates), RETENTION_DAYS,
+        )
+        for app_row in age_candidates:
+            try:
+                outcomes.append(retire_app(app_row.id, reason="age"))
+            except Exception as exc:
+                log.error("rotation: failed to age-retire %s: %s", app_row.id, exc)
+    else:
+        log.info("rotation: age pass found no apps older than %d days", RETENTION_DAYS)
+
+    # Cap pass: if still over cap, retire the oldest remaining.
     live = db.list_live_apps_oldest_first()
     excess = len(live) - cap
-    if excess <= 0:
-        log.info("rotation: %d live apps, cap=%d, nothing to retire", len(live), cap)
-        return []
-
-    log.info("rotation: %d live apps, cap=%d, retiring %d oldest", len(live), cap, excess)
-    outcomes: list[RetireOutcome] = []
-    for app_row in live[:excess]:
-        try:
-            outcomes.append(retire_app(app_row.id, reason="rotation"))
-        except Exception as exc:
-            log.error("rotation: failed to retire %s: %s", app_row.id, exc)
+    if excess > 0:
+        log.info(
+            "rotation: cap pass, %d live apps after age pass, cap=%d, retiring %d oldest",
+            len(live), cap, excess,
+        )
+        for app_row in live[:excess]:
+            try:
+                outcomes.append(retire_app(app_row.id, reason="rotation"))
+            except Exception as exc:
+                log.error("rotation: failed to cap-retire %s: %s", app_row.id, exc)
+    else:
+        log.info("rotation: cap pass, %d live apps, cap=%d, nothing to retire", len(live), cap)
 
     if push_snapshot:
         try:

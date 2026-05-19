@@ -155,11 +155,23 @@ export type DailyCounts = {
   matcherRejected: number;
 };
 
-/** Counts since 00:00 UTC today. Operating-data line under the grid. */
-export async function getTodayCounts(): Promise<DailyCounts> {
-  const startOfDay = new Date();
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const since = startOfDay.toISOString();
+/** Counts since `sinceISO`. Defaults to 00:00 UTC today.
+ *
+ *  Bundle L+2: the SSR pass calls this without an argument (UTC fallback).
+ *  After hydration the TodayCounts client component refetches using the
+ *  viewer's local midnight, so the displayed counts match what "today"
+ *  feels like to the viewer rather than to UTC. The label stays "Today";
+ *  the underlying since-time is what shifts.
+ */
+export async function getTodayCounts(sinceISO?: string): Promise<DailyCounts> {
+  let since: string;
+  if (sinceISO) {
+    since = sinceISO;
+  } else {
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    since = startOfDay.toISOString();
+  }
 
   const [shippedRes, guardRes, matcherRes] = await Promise.all([
     supabase
