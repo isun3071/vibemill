@@ -30,9 +30,9 @@ Reasoning-mode generator calls produce distinct fingerprints, longer "considered
 
 Reasoning is tier-driven (see `vibemill/model_rotation.py`):
 
-- **Slop tier (~10%): reasoning disabled.** The vibecoder running on fumes at 3am isn't turning on reasoning. Cheapest, fastest, sloppiest.
-- **Mean_good tier (~82%): reasoning LOW.** A touch of reasoning for cross file coherence, the subsidiary prize winning team thought a *little* about it. Effective output ~$0.42/M.
-- **Banger tier (~8%): reasoning MEDIUM.** The committed-QA team actually deliberates. Effective output ~$0.84/M.
+- **Slop tier (~10%): reasoning disabled** on DeepSeek V4 Flash. The vibecoder running on fumes at 3am is not turning on reasoning. Cheapest, fastest, sloppiest.
+- **Mean_good tier (~82%): reasoning MEDIUM** on DeepSeek V4 Flash. Meaningful deliberation for cross file coherence; the subsidiary prize winning team actually thought about the build.
+- **Banger tier (~8%): reasoning MEDIUM on DeepSeek V4 Pro.** The committed QA team picked the larger substrate AND turned on reasoning. Pro is roughly 2 to 3 times the per token cost of Flash but still well under one cent per app at the typical token budget.
 - **Guard and matcher: reasoning disabled.** Fast classification, not deliberation.
 
 The per-tier asymmetry is itself faithful: in a real population of vibecoders, the half-assing cohort doesn't toggle reasoning; the polishing cohort does. Vibe Mill mirrors that.

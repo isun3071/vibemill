@@ -34,20 +34,32 @@ class ModelChoice:
     reasoning_effort: ReasoningEffort
 
 
-# Tier-driven reasoning effort. Sub-prize-winner mean_good gets a touch of
-# reasoning (low) for cross-file coherence; banger gets more (medium);
-# slop runs with reasoning disabled.
+# Tier-driven reasoning effort. Mean_good gets meaningful deliberation
+# (medium) for cross-file coherence; banger gets the same medium effort
+# but on the larger V4 Pro substrate. Slop runs with reasoning disabled.
 _TIER_REASONING: dict[str, ReasoningEffort] = {
     "slop": "disabled",
-    "mean_good": "low",
+    "mean_good": "medium",
     "banger": "medium",
+}
+
+# Per-tier generator model overrides. Tiers not listed fall through to
+# settings.GENERATOR_MODEL (currently DeepSeek V4 Flash). Banger uses
+# the larger V4 Pro substrate, which on OpenRouter is roughly 2-3x the
+# per-token cost of Flash and still well under one cent per app at the
+# typical token budgets.
+_TIER_GENERATOR_MODEL: dict[str, str] = {
+    "banger": "deepseek/deepseek-v4-pro",
 }
 
 
 def generator_model_for_tier(tier: str | None) -> ModelChoice:
-    """Return the configured generator substrate with tier-driven reasoning."""
-    slug = get_settings().GENERATOR_MODEL
-    effort: ReasoningEffort = _TIER_REASONING.get(tier or "mean_good", "disabled")
+    """Return the tier-appropriate generator substrate with reasoning effort.
+    Tier-specific model overrides win; otherwise fall back to the
+    project-wide GENERATOR_MODEL setting."""
+    t = tier or "mean_good"
+    slug = _TIER_GENERATOR_MODEL.get(t, get_settings().GENERATOR_MODEL)
+    effort: ReasoningEffort = _TIER_REASONING.get(t, "disabled")
     return ModelChoice(slug=slug, reasoning_effort=effort)
 
 
