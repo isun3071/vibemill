@@ -72,12 +72,25 @@ export async function AppGrid({
       {totalPages > 1 ? (
         <nav
           aria-label="output pagination"
-          className="mt-10 flex items-center justify-center gap-6 font-mono text-xs"
+          className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-xs"
         >
+          {hasPrev ? (
+            <Link
+              href={hrefFor(1)}
+              className="text-ink-muted dark:text-moon-muted hover:text-ink dark:hover:text-moon transition-colors"
+              aria-label="first page"
+            >
+              &laquo; First
+            </Link>
+          ) : (
+            <span className="text-ink-faint dark:text-moon-faint select-none">&laquo; First</span>
+          )}
+
           {hasPrev ? (
             <Link
               href={hrefFor(clampedPage - 1)}
               className="text-ink-muted dark:text-moon-muted hover:text-ink dark:hover:text-moon transition-colors"
+              aria-label="previous page"
             >
               &larr; Prev
             </Link>
@@ -93,11 +106,24 @@ export async function AppGrid({
             <Link
               href={hrefFor(clampedPage + 1)}
               className="text-ink-muted dark:text-moon-muted hover:text-ink dark:hover:text-moon transition-colors"
+              aria-label="next page"
             >
               Next &rarr;
             </Link>
           ) : (
             <span className="text-ink-faint dark:text-moon-faint select-none">Next &rarr;</span>
+          )}
+
+          {hasNext ? (
+            <Link
+              href={hrefFor(totalPages)}
+              className="text-ink-muted dark:text-moon-muted hover:text-ink dark:hover:text-moon transition-colors"
+              aria-label="last page"
+            >
+              Last &raquo;
+            </Link>
+          ) : (
+            <span className="text-ink-faint dark:text-moon-faint select-none">Last &raquo;</span>
           )}
         </nav>
       ) : null}
