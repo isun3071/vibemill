@@ -20,6 +20,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://vibemill.dev"),
   title: "Vibe Mill",
   description:
     "A machine that produces web applications from news headlines and hackathon-style prompts. About five to ten per day.",
@@ -30,6 +31,21 @@ export const metadata: Metadata = {
     url: "https://vibemill.dev",
     siteName: "Vibe Mill",
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Vibe Mill",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Vibe Mill",
+    description:
+      "A machine that produces web applications from news headlines and hackathon-style prompts.",
+    images: ["/og.png"],
   },
 };
 

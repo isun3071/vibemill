@@ -29,7 +29,7 @@ export default function AboutPage() {
       </p>
 
       <p className="mb-6">
-        Major League Hacking, which governs most US college hackathons,
+        Major League Hacking, which sets the standard rules for most US college hackathons,
         publishes its judging rules openly. The rules explicitly exclude
         code quality and idea novelty from scoring. Broken demos are
         explicitly accepted. Meanwhile, career advice infrastructure tells
@@ -43,7 +43,7 @@ export default function AboutPage() {
         judges accept. The conditions match because the conditions are
         documented. The artifacts are operationally indistinguishable from
         what a sub-prize-winning team ships in thirty-six hours. The mill
-        produces about fifteen of them in the same window for roughly a
+        produces up to fifteen of them in the same window for roughly a
         dollar in tokens.
       </p>
 
@@ -54,6 +54,14 @@ export default function AboutPage() {
         to do this. The university told them to put it on their resume.
         The hiring managers told them it was signal. Vibe Mill exists to
         make the lie undeniable.
+      </p>
+
+      <p className="mb-6">
+        The artifact was only ever a proxy for capability. The proxy held
+        only while producing the artifact required the capability. That
+        condition no longer holds. The artifact proves nothing. Whatever
+        proves a person can build software is not the existence of built
+        software. It is something asked of the person directly.
       </p>
 
       <p className="mb-10">

@@ -54,17 +54,64 @@ const APP_COLUMNS =
   "source_metadata, status, tier, readme_persona, verifier_verdict, " +
   "synthetic_track, blend_partner_archetype, created_at, retired_at";
 
+/** Homepage filter selections. The grid reads these from URL search params
+ *  via the <AppFilters> client component, which writes them on change.
+ *  - q: free-text substring match against the app id (the github repo slug)
+ *  - archetype: exact archetype string (e.g. "tracker", "ai_agent")
+ *  - tier: exact tier string ("slop" | "mean_good" | "banger")
+ *  - since: relative window key ("24h" | "7d" | "30d"); absent means all time */
+export type AppFilters = {
+  q?: string;
+  archetype?: string;
+  tier?: string;
+  since?: string;
+};
+
+const SINCE_WINDOWS_MS: Record<string, number> = {
+  "24h": 86_400_000,
+  "7d": 604_800_000,
+  "30d": 2_592_000_000,
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyFilters(query: any, filters?: AppFilters): any {
+  let q = query;
+  if (filters?.q) {
+    // Match against the app id (which is the human-readable github slug).
+    // ilike is case-insensitive substring.
+    q = q.ilike("id", `%${filters.q}%`);
+  }
+  if (filters?.archetype) {
+    q = q.eq("archetype", filters.archetype);
+  }
+  if (filters?.tier) {
+    q = q.eq("tier", filters.tier);
+  }
+  if (filters?.since && SINCE_WINDOWS_MS[filters.since]) {
+    const since = new Date(Date.now() - SINCE_WINDOWS_MS[filters.since]).toISOString();
+    q = q.gte("created_at", since);
+  }
+  return q;
+}
+
 /** Latest live apps with a live URL on any rail, newest first.
  *  Bundle I: github_only apps don't have vercel_url or hf_space_url
  *  but DO have github_url; filter on that disjunction.
  *  Supabase .range(from, to) is inclusive on both ends; offset is the
  *  starting row, limit determines the slice size. */
-export async function getLiveApps(limit = 24, offset = 0): Promise<App[]> {
-  const { data, error } = await supabase
+export async function getLiveApps(
+  limit = 24,
+  offset = 0,
+  filters?: AppFilters,
+): Promise<App[]> {
+  let query = supabase
     .from("apps")
     .select(APP_COLUMNS)
     .eq("status", "live")
-    .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null")
+    .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query = applyFilters(query as any, filters);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) {
@@ -74,13 +121,17 @@ export async function getLiveApps(limit = 24, offset = 0): Promise<App[]> {
   return (data ?? []) as unknown as App[];
 }
 
-/** Total live-apps count, used by pagination math. */
-export async function getLiveAppsCount(): Promise<number> {
-  const { count, error } = await supabase
+/** Total live-apps count, used by pagination math. Accepts the same
+ *  filters as getLiveApps so pagination reflects the filtered result. */
+export async function getLiveAppsCount(filters?: AppFilters): Promise<number> {
+  let query = supabase
     .from("apps")
     .select("id", { count: "exact", head: true })
     .eq("status", "live")
     .or("vercel_url.not.is.null,hf_space_url.not.is.null,github_url.not.is.null");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query = applyFilters(query as any, filters);
+  const { count, error } = await query;
   if (error) {
     console.error("[queries] getLiveAppsCount:", error.message);
     return 0;

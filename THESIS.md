@@ -1,6 +1,6 @@
 # Thesis
 
-> *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."*, [Andrej Karpathy, December 2025](https://x.com/karpathy/status/2004607146781278521)
+> *"The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between."*, [Andrej Karpathy, October 2025](https://x.com/karpathy/status/2004607146781278521)
 
 > **Authorship disclosure.** This thesis and the other markdown documents in this repository (`ANTI_PATTERNS.md`, `CLAUDE.md`, `CHANGELOG.md`, `LAUNCH_NOTES.md`, the README) were written in conversation with Claude. The orchestrator code in `vibemill/` was built in pair programming sessions with Claude Code. The human author supplied the framework, the four pillars, the design decisions, the operational discipline, and the meta-frame; Claude supplied prose and code generation. **The artifacts the orchestrator itself produces, in contrast, involve no human at all.** That distinction is the project's entire load bearing point and is unpacked further in the [Authorship note](#authorship-note) section at the bottom of this document.
 
@@ -367,7 +367,7 @@ Citations referenced inline in this thesis, gathered here for verification.
 
 **Karpathy on vibe coding and the changing programmer profession**
 - [Karpathy, February 2, 2025: "There's a new kind of coding I call 'vibe coding'..."](https://x.com/karpathy/status/1886192184808149383)
-- [Karpathy, December 26, 2025: "I've never felt this much behind as a programmer. The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between..."](https://x.com/karpathy/status/2004607146781278521)
+- [Karpathy, October 2025: "I've never felt this much behind as a programmer. The profession is being dramatically refactored as the bits contributed by the programmer are increasingly sparse and between..."](https://x.com/karpathy/status/2004607146781278521)
 
 **Major League Hacking judging rules and submission policies**
 - [MLH standard hackathon rules (judging criteria explicitly exclude code quality and idea novelty)](https://github.com/MLH/mlh-policies/blob/main/standard-hackathon-rules.md)

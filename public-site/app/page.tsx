@@ -11,18 +11,30 @@ import { getLastShippedAt } from "@/lib/queries";
 export const dynamic = "force-dynamic";
 
 type HomePageProps = {
-  searchParams: { page?: string };
+  searchParams: {
+    page?: string;
+    q?: string;
+    archetype?: string;
+    tier?: string;
+    since?: string;
+  };
 };
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const raw = parseInt(searchParams.page ?? "1", 10);
   const page = Number.isFinite(raw) && raw > 0 ? raw : 1;
+  const filters = {
+    q: searchParams.q || undefined,
+    archetype: searchParams.archetype || undefined,
+    tier: searchParams.tier || undefined,
+    since: searchParams.since || undefined,
+  };
   const lastShippedAt = await getLastShippedAt();
   return (
     <>
       <Hero />
       <MillStatus lastShippedAt={lastShippedAt} />
-      <AppGrid page={page} />
+      <AppGrid page={page} filters={filters} />
       <AboutTeaser />
     </>
   );

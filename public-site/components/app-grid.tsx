@@ -1,16 +1,23 @@
 import Link from "next/link";
-import { getLiveApps, getLiveAppsCount, getTodayCounts } from "@/lib/queries";
+import { getLiveApps, getLiveAppsCount, getTodayCounts, type AppFilters } from "@/lib/queries";
 import { AppCard } from "./app-card";
 import { TodayCounts } from "./today-counts";
+import { AppFilters as AppFiltersBar } from "./app-filters";
 
 const PER_PAGE = 12; // 4 cols x 3 rows at lg breakpoint
 
-export async function AppGrid({ page = 1 }: { page?: number }) {
+export async function AppGrid({
+  page = 1,
+  filters,
+}: {
+  page?: number;
+  filters?: AppFilters;
+}) {
   const safePage = Math.max(1, Math.floor(page));
   const offset = (safePage - 1) * PER_PAGE;
   const [apps, total, counts] = await Promise.all([
-    getLiveApps(PER_PAGE, offset),
-    getLiveAppsCount(),
+    getLiveApps(PER_PAGE, offset, filters),
+    getLiveAppsCount(filters),
     getTodayCounts(),
   ]);
 
@@ -19,9 +26,20 @@ export async function AppGrid({ page = 1 }: { page?: number }) {
   const hasPrev = clampedPage > 1;
   const hasNext = clampedPage < totalPages;
 
-  // Build page-link hrefs. Page 1 drops the query param entirely so the
-  // canonical home URL matches the first page.
-  const hrefFor = (p: number) => (p <= 1 ? "/#output" : `/?page=${p}#output`);
+  // Build page-link hrefs. Page 1 drops the page param so the canonical
+  // home URL matches the first page; current filter params are preserved
+  // across pagination.
+  const filterQS = new URLSearchParams();
+  if (filters?.q) filterQS.set("q", filters.q);
+  if (filters?.archetype) filterQS.set("archetype", filters.archetype);
+  if (filters?.tier) filterQS.set("tier", filters.tier);
+  if (filters?.since) filterQS.set("since", filters.since);
+  const hrefFor = (p: number) => {
+    const qs = new URLSearchParams(filterQS);
+    if (p > 1) qs.set("page", String(p));
+    const s = qs.toString();
+    return s ? `/?${s}#output` : "/#output";
+  };
 
   return (
     <section
@@ -29,9 +47,15 @@ export async function AppGrid({ page = 1 }: { page?: number }) {
       className="w-full px-6 sm:px-10 py-16 max-w-7xl mx-auto"
       aria-label="recent output"
     >
-      <h2 className="font-serif text-xl sm:text-2xl mb-8 text-ink dark:text-moon">
-        {clampedPage === 1 ? "Today’s output:" : "Output, continued:"}
+      <h2 className="font-serif text-xl sm:text-2xl mb-6 text-ink dark:text-moon">
+        {filters && Object.values(filters).some(Boolean)
+          ? "Filtered output:"
+          : clampedPage === 1
+            ? "Today’s output:"
+            : "Output, continued:"}
       </h2>
+
+      <AppFiltersBar />
 
       {apps.length === 0 ? (
         <p className="font-mono text-sm text-ink-muted dark:text-moon-muted">

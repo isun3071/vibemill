@@ -27,16 +27,14 @@ export function Hero() {
           &ldquo;The profession is being dramatically refactored as the bits
           contributed by the programmer are increasingly sparse and between.&rdquo;
           <footer className="not-italic text-sm mt-2 text-right text-ink-faint dark:text-moon-faint">
-            &mdash; Andrej Karpathy, 2025
+            &mdash; Andrej Karpathy, October 2025
           </footer>
         </blockquote>
       </div>
 
       <div className="relative z-10 flex-1 flex items-center justify-center px-2">
         <h1 className="max-w-4xl font-serif text-3xl sm:text-5xl leading-tight tracking-tight text-center text-ink dark:text-moon">
-          Vibe Mill has removed the last step
-          <br />
-          in vibe coding: the vibe check.
+          Vibe Mill has removed the last step<br />in vibe coding: the vibe check.
         </h1>
       </div>
 
