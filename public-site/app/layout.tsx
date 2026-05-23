@@ -23,11 +23,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://vibemill.dev"),
   title: "Vibe Mill",
   description:
-    "A machine that produces web applications from news headlines and hackathon-style prompts. About five to ten per day.",
+    "A machine that produces web applications from news headlines and hackathon prompts.",
   openGraph: {
     title: "Vibe Mill",
     description:
-      "A machine that produces web applications from news headlines and hackathon-style prompts.",
+      "A machine that produces web applications from news headlines and hackathon prompts.",
     url: "https://vibemill.dev",
     siteName: "Vibe Mill",
     type: "website",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Vibe Mill",
     description:
-      "A machine that produces web applications from news headlines and hackathon-style prompts.",
+      "A machine that produces web applications from news headlines and hackathon prompts.",
     images: ["/og.png"],
   },
 };

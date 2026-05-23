@@ -13,8 +13,7 @@ export default function AboutPage() {
 
       <p className="mb-6">
         Vibe Mill is a machine that produces web applications from news
-        headlines and hackathon-style prompts. It runs every four hours and
-        ships five to ten apps per day. The pipeline runs end to end without
+        headlines and hackathon prompts. It runs every four hours. The pipeline runs end to end without
         human review. Apps cost between five and seventy cents to produce,
         depending on tier. The average is about thirty cents.
       </p>
@@ -23,26 +22,25 @@ export default function AboutPage() {
         Each app is published as a GitHub repo, a live deployment, and a
         screenshot. Every artifact discloses, in its README and footer, that
         it was produced by an automated pipeline. After twenty-one days each
-        app is retired to a cemetery with its cause of death and total cost
-        recorded. The mill does not promise quality. It does not promise
-        relevance. It ships.
+        app is retired (aka "deprecated") to a cemetery with its cause of death
+        recorded. The mill does not promise quality or relevance. It ships regardless.
       </p>
 
       <p className="mb-6">
         Major League Hacking, which sets the standard rules for most US college hackathons,
-        publishes its judging rules openly. The rules explicitly exclude
+        publishes its judging rules openly. The rules exclude
         code quality and idea novelty from scoring. Broken demos are
-        explicitly accepted. Meanwhile, career advice infrastructure tells
-        juniors to put hackathon work on their resumes, hiring managers
-        report seeking hackathon experience as signal, and resume guides
+        explicitly accepted. Meanwhile, career advice tells
+        juniors to put hackathon projects on their resumes, hiring managers
+        report seeking hackathon experience, and resume guides
         teach juniors to frame the roughness of their submissions as grit.
       </p>
 
       <p className="mb-6">
         Vibe Mill produces artifacts under conditions that match what MLH
         judges accept. The conditions match because the conditions are
-        documented. The artifacts are operationally indistinguishable from
-        what a sub-prize-winning team ships in thirty-six hours. The mill
+        documented. The artifacts are indistinguishable from
+        what a typical team ships in 24-36 hours. The mill
         produces up to fifteen of them in the same window for roughly a
         dollar in tokens.
       </p>
@@ -52,7 +50,7 @@ export default function AboutPage() {
         their backend die ten minutes before submission, is not the joke.
         The kid is the person being lied to. The career advice told them
         to do this. The university told them to put it on their resume.
-        The hiring managers told them it was signal. Vibe Mill exists to
+        The hiring managers told them it was valuable. Vibe Mill exists to
         make the lie undeniable.
       </p>
 
@@ -74,7 +72,7 @@ export default function AboutPage() {
         >
           THESIS.md
         </a>
-        . The operational rules that keep the mill from drifting toward a
+        . The rules that keep the mill from drifting toward a
         productivity tool live in{" "}
         <a
           href="https://github.com/isun3071/vibemill/blob/main/ANTI_PATTERNS.md"
@@ -89,12 +87,19 @@ export default function AboutPage() {
         It does not produce Vibe Mill.
       </p>
 
-      <p className="text-ink-muted dark:text-moon-muted text-base">
+      <p className="text-ink-muted dark:text-moon-muted text-base mb-10">
         Vibe Mill itself was vibecoded. The orchestrator was built with
         Claude Code in pair-programming sessions; the thesis was written
         in conversation with Claude. The orchestrator’s design involved a
         human. The artifacts the orchestrator produces involve none. The
         distinction is the entire point.
+      </p>
+
+      <p className="text-ink-muted dark:text-moon-muted text-base">
+        Vibe Mill is built by Ian Sun, a cybersecurity practitioner whose
+        research concerns the human layer of hiring and credentialing.
+        He has presented related work at RSAC, SecureWorld, NICE, and
+        Layer 8.
       </p>
     </article>
   );
