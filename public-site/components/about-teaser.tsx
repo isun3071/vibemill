@@ -7,7 +7,7 @@ export function AboutTeaser() {
         <hr className="border-ink/15 dark:border-moon/15 mb-10" />
         <p className="font-serif text-lg leading-relaxed text-ink dark:text-moon">
           Vibe Mill is a machine that produces web applications from news
-          headlines and hackathon-style prompts, about five to ten per day. The
+          headlines and prompts. The
           pipeline runs end to end without human review.
         </p>
         <Link

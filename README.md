@@ -2,7 +2,7 @@
 
 Vibe Mill is an app machine. It grinds vibes into apps.
 
-The mill produces vibecoded web applications from news headlines and synthetic hackathon prompts on a slow cadence, roughly five to ten apps per day in bursts every four hours. The mill does not promise quality, does not promise relevance, and ships anyway. Output lives for twenty one days, then retires to a public cemetery with cause of death and total cost recorded.
+The mill produces vibecoded web applications from news headlines and synthetic hackathon prompts on a slow cadence, in bursts every four hours. The mill does not promise quality, does not promise relevance, and ships anyway. Output lives for twenty one days, then retires to a public cemetery with cause of death and total cost recorded.
 
 This repository contains the orchestrator, the archetype templates, the prompts, and the Next.js public site that runs at [vibemill.dev](https://vibemill.dev).
 
